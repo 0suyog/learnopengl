@@ -18,19 +18,19 @@ void process_input(GLFWwindow *window) {
 const char *vertexShaderSource =
     "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
-    // "layout (location = 1) in vec3 aColor;\n"
-    // "out ourColor;"
+    "layout (location = 1) in vec3 aColor;\n"
+    "out vec3 ourColor;"
     "void main()\n"
     "{\n"
     "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-    // "	  ourColor = aColor;"
+    "	  ourColor =  aColor;"
     "}\0";
 const char *fragmentShaderSource = "#version 330 core\n"
                                    "out vec4 FragColor;\n"
-                                   " uniform vec4 OurColor;\n"
+                                   "in vec3 ourColor;\n"
                                    "void main()\n"
                                    "{\n"
-                                   "	  FragColor=OurColor;"
+                                   "	  FragColor=vec4(ourColor,1.0);"
                                    "}\n\0";
 
 int main() {
@@ -90,7 +90,7 @@ int main() {
   glAttachShader(shaderProgram, fragmentshader);
   glLinkProgram(shaderProgram);
 
-  glGetProgramiv(shaderProgram, GL_COMPILE_STATUS, &success);
+  glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
 
   if (!success) {
     glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
@@ -100,9 +100,20 @@ int main() {
   glDeleteShader(fragmentshader);
   glDeleteShader(vertexshader);
 
-  // float vertices[] = {-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0, 0.5, 0.0};
-  float vertices[] = {0.5f,  0.5f,  0.0f, 0.5f,  -0.5f, 0.0f,
-                      -0.5f, -0.5f, 0.0f, -0.5f, 0.5f,  0.0f};
+  float vertices[] = {
+      0.5,  -0.5, 0.0,  // pos
+      1.0f, 0.0f, 0.0f, // color
+      -0.5, -0.5, 0.0,  // pos
+      0.0f, 1.0f, 0.0f, // corol
+      0.0,  0.5,  0.0,  // pos
+      0.0f, 0.0f, 1.0f  // color
+  };
+  // float vertices[] = {
+  //     0.5f,  0.5f,  0.0f, // smtg
+  //     0.5f,  -0.5f, 0.0f, // smtg
+  //     -0.5f, -0.5f, 0.0f, // smtg
+  //     -0.5f, 0.5f,  0.0f  // smtg
+  // };
 
   unsigned int indices[] = {0, 1, 3, 1, 2, 3};
 
@@ -122,8 +133,11 @@ int main() {
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
                GL_STATIC_DRAW);
 
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -133,16 +147,17 @@ int main() {
     process_input(window);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    float timeValue = glfwGetTime();
-    float greenValue = (std::sin(timeValue) / 2.0f) + 0.5f;
-    int vertexColorLocation = glGetUniformLocation(shaderProgram, "OurColor");
+    // float timeValue = glfwGetTime();
+    // float greenValue = (std::sin(timeValue) / 2.0f) + 0.5f;
+    // int vertexColorLocation = glGetUniformLocation(shaderProgram,
+    // "OurColor");
     glUseProgram(shaderProgram);
-    glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+    // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
     glBindVertexArray(VAO);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLES, 0, 4);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

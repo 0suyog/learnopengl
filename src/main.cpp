@@ -55,10 +55,12 @@ int main() {
   for (int i = 0; i < noOfImages; i++) {
     glActiveTexture(GL_TEXTURE0 + i);
     glBindTexture(GL_TEXTURE_2D, textures[i]);
+    float borderColor[] = {0.5f, 1.0f, 0.5f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     unsigned char *data = stbi_load(imagePaths[i].c_str(), &texWidth,
                                     &texHeight, &texNrChannels, 0);
@@ -79,42 +81,10 @@ int main() {
     }
     stbi_image_free(data);
   }
-  // glBindTexture(GL_TEXTURE_2D, textures[0]);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  //
-  // int texWidth, texHeight, texNrChannels;
-  // unsigned char *data =
-  //     stbi_load("../images/wall.jpg", &texWidth, &texHeight, &texNrChannels,
-  //     0);
-  //
-  // if (data) {
-  //   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB,
-  //                GL_UNSIGNED_BYTE, data);
-  //   glGenerateMipmap(GL_TEXTURE_2D);
-  // } else {
-  //   std::cerr << "Failed loading texture" << std::endl;
-  // }
-  // stbi_image_free(data);
 
-  // float vertices[] = {
-  //     0.5,
-  //     -0.5,
-  //     0.0, // pos
-  //     // 1.0f, 0.0f, 0.0f, // color
-  //     -0.5,
-  //     -0.5,
-  //     0.0, // pos
-  //     // 0.0f, 1.0f, 0.0f, // corol
-  //     0.0,
-  //     0.5,
-  //     0.0, // pos
-  //          // 0.0f, 0.0f, 1.0f  // color
-  // };
   float vertices[] = {
       0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, // smtg
-      0.5f,  -0.5f, 0.0f, 0.0f, 0.1f, 0.0f, 1.0f, 0.0f, // smtg
+      0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, // smtg
       -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // smtg
       -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f  // smtg
   };
@@ -150,11 +120,18 @@ int main() {
 
   glBindVertexArray(0);
 
+  float a = 0.0f;
   while (!glfwWindowShouldClose(window)) {
     process_input(window);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     float timeValue = glfwGetTime();
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      a += 0.01;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      a -= 0.01;
+    }
     // float greenValue = (std::sin(timeValue) / 2.0f) + 0.5f;
     // int vertexColorLocation = glGetUniformLocation(shaderProgram,
     // "OurColor
@@ -162,6 +139,7 @@ int main() {
     shaderProgram.use();
     shaderProgram.setInt("texture1", 0);
     shaderProgram.setInt("texture2", 1);
+    shaderProgram.setFloat("a", a);
     // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
     glBindVertexArray(VAO);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

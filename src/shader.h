@@ -29,13 +29,15 @@ public:
       vertexCode = vShaderStream.str();
       fragmentCode = fShaderStream.str();
 
+      vShaderFile.close();
+      fShaderFile.close();
+
     } catch (std::ifstream::failure e) {
       std::cerr << "ERROR: SHADER:: FAILED LOADING FILE" << e.what()
                 << std::endl;
     }
     auto vShaderCode = vertexCode.c_str();
     auto fShaderCode = fragmentCode.c_str();
-
     unsigned int vertexShader, fragmentShader;
     int success;
     char infoLog[512];
@@ -79,7 +81,7 @@ public:
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
   }
-  void use() { glUseProgram(ID); }
+  void use() const { glUseProgram(ID); }
   void setBool(const std::string &name, bool value) {
     auto uniformLocation = glGetUniformLocation(ID, name.c_str());
     glUniform1i(uniformLocation, value);

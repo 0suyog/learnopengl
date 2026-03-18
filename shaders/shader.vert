@@ -1,10 +1,12 @@
 #version 330 core
 layout (location = 0) in vec3 aPos;
-uniform float movingVertex;
-out vec4 vertPos;
+layout (location = 1) in vec3 aColor;
+layout (location = 2)in vec2 aTexCoord;
+out vec3 OurColor;
+out vec2 TexCoord;
 
 void main(){
-  // gl_Position = vec4(aPos,1.0);
-  gl_Position = vec4(aPos.x+movingVertex,aPos.y+movingVertex,aPos.z+movingVertex,1.0);
-  vertPos = gl_Position;
+  gl_Position = vec4(aPos,1.0);
+  OurColor = aColor;
+  TexCoord =  aTexCoord;
 };

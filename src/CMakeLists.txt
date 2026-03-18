@@ -16,8 +16,10 @@ target_link_directories(common INTERFACE ${CMAKE_SOURCE_DIR}/../Libs)
 
 target_link_libraries(common INTERFACE glfw3 GL dl pthread X11)
 
+file(GLOB SHADERS "../shaders/*")
+
 add_executable(opengltut ${CMAKE_CURRENT_SOURCE_DIR}/glad.cpp
-                         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
+								 ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${SHADERS})
 target_link_libraries(opengltut PRIVATE common)
 add_executable(5_8_1 ${CMAKE_CURRENT_SOURCE_DIR}/exercise/5_8_1.cpp
                      ${CMAKE_CURRENT_SOURCE_DIR}/glad.cpp)

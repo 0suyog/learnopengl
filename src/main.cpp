@@ -1,3 +1,9 @@
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/geometric.hpp"
+#include "glm/trigonometric.hpp"
+#include <cstdlib>
 #include <string>
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
@@ -8,6 +14,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <ostream>
+#include "glm/gtc/type_ptr.hpp"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
@@ -45,6 +52,7 @@ int main() {
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
   Shader shaderProgram("../shaders/shader.vert", "../shaders/shader.frag");
+  Shader wShaderProgram("../shaders/wshader.vert", "../shaders/wshader.frag");
   stbi_set_flip_vertically_on_load(true);
   std::vector<std::string> imagePaths = {"../images/container.jpg",
                                          "../images/awesomeface.png"};
@@ -89,11 +97,30 @@ int main() {
       -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f  // smtg
   };
 
+  float wVertices[] = {
+      0.0f,  0.4f,  0.0f, // E
+      0.0f,  0.03f, 0.0f, // F
+      0.3f,  0.2f,  0.0f, // G
+      0.5f,  0.0f,  0.0f, // H
+      0.7f,  0.6f,  0.0f, // I
+      0.6f,  0.6f,  0.0f, // J
+      -0.3f, 0.2f,  0.0f, // A
+      -0.5f, 0.0f,  0.0f, // D
+      -0.7f, 0.6f,  0.0f, // C
+      -0.6f, 0.6f,  0.0f, // B
+  };
+
+  unsigned int wIndices[] = {6, 9, 8, 6, 7, 8, 6, 7, 1, 6, 0, 1,
+                             1, 0, 2, 1, 2, 3, 2, 3, 4, 2, 5, 4};
+
   unsigned int indices[] = {0, 1, 3, 1, 2, 3};
 
   unsigned int VAO;
+  unsigned int wVAO;
   unsigned int VBO;
+  unsigned int wVBO;
   unsigned int EBO;
+  unsigned int wEBO;
 
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
@@ -120,7 +147,31 @@ int main() {
 
   glBindVertexArray(0);
 
+  glGenVertexArrays(1, &wVAO);
+  glGenBuffers(1, &wVBO);
+  glGenBuffers(1, &wEBO);
+
+  glBindVertexArray(wVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, wVBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(wVertices), wVertices, GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wEBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(wIndices), wIndices,
+               GL_STATIC_DRAW);
+
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  glBindVertexArray(0);
+
   float a = 0.0f;
+  // transformations
+  float angle = 45.0f;
+  auto trans = glm::mat4(1.0f);
+  trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 1.0f));
+  trans = glm::rotate(trans, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
   while (!glfwWindowShouldClose(window)) {
     process_input(window);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -140,14 +191,32 @@ int main() {
     shaderProgram.setInt("texture1", 0);
     shaderProgram.setInt("texture2", 1);
     shaderProgram.setFloat("a", a);
+    auto trans = glm::mat4(1.0f);
+    trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 1.0f));
+    trans = glm::translate(trans, glm::vec3(0.8f, -0.8f, 1.0f));
+    trans =
+        glm::rotate(trans, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    int transformLoc = glGetUniformLocation(shaderProgram.ID, "transform");
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+    angle += 1;
     // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
     glBindVertexArray(VAO);
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     // glDrawArrays(GL_TRIANGLES, 0, 4);
     // glBindTexture(GL_TEXTURE_2D, texture1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
+    wShaderProgram.use();
+    auto wtrans = glm::mat4(1.0);
+    wtrans =
+        glm::scale(wtrans, glm::vec3(cos(glfwGetTime()), cos(glfwGetTime()),
+                                     cos(glfwGetTime())));
+    int wshaderScaleLoc = glGetUniformLocation(wShaderProgram.ID, "scale");
+    glUniformMatrix4fv(wshaderScaleLoc, 1, GL_FALSE, glm::value_ptr(wtrans));
+    glBindVertexArray(wVAO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wEBO);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glDrawElements(GL_TRIANGLES, sizeof(wIndices) / sizeof(unsigned int),
+                   GL_UNSIGNED_INT, 0);
     glfwSwapBuffers(window);
     glfwPollEvents();
   }

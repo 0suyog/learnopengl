@@ -4,7 +4,7 @@ project(
   LearningOpengl
   VERSION 1
   LANGUAGES CXX)
-
+find_package(assimp REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -14,7 +14,7 @@ target_include_directories(common INTERFACE ${CMAKE_SOURCE_DIR}/../Include)
 
 target_link_directories(common INTERFACE ${CMAKE_SOURCE_DIR}/../Libs)
 
-target_link_libraries(common INTERFACE glfw3 GL dl pthread X11)
+target_link_libraries(common INTERFACE glfw3 GL dl pthread X11 assimp)
 
 file(GLOB SHADERS "../shaders/*")
 

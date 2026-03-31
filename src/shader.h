@@ -1,6 +1,8 @@
 #pragma once
 
 #include "glad/glad.h"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -92,4 +94,8 @@ public:
   void setFloat(const std::string &name, float value) {
     glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
   };
+  void setMat4f(const std::string &name, const glm::mat4 &value) {
+    glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE,
+                       glm::value_ptr(value));
+  }
 };

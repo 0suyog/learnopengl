@@ -23,7 +23,7 @@ public:
     return glm::lookAt(position, position + direction, up);
   }
 
-  void move(GLFWwindow *window) {
+  void move(GLFWwindow *window, float deltaTime) {
     auto movementVector = glm::vec3(0.0f, 0.0f, 0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
       movementVector += direction;
@@ -42,12 +42,12 @@ public:
       return;
     }
     movementVector = glm::normalize(movementVector);
-    position += 0.1f * movementVector;
+    position += deltaTime * 1.5f * movementVector;
   }
 
   void rotate(double *prevx, double *prevy, float x, float y) {
     yaw += (x - *prevx) * camSensitivity;
-    pitch -= (y - *prevy) * camSensitivity;
+    pitch += (y - *prevy) * camSensitivity;
     *prevx = x;
     *prevy = y;
   }

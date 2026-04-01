@@ -52,7 +52,7 @@ unsigned int TextureFromFile(const char *path, const std::string &directory) {
 
 class Model {
 public:
-  Model(char *path) { LoadModel(path); }
+  Model(std::string path) { LoadModel(path); }
 
   void Draw(Shader &shader) {
     for (auto mesh : meshes) {
@@ -109,6 +109,7 @@ private:
       } else {
         vertex.TexCoords = glm::vec2(0.0f, 0.0f);
       }
+      vertices.push_back(vertex);
     }
     for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
       aiFace face = mesh->mFaces[i];

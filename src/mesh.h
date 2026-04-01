@@ -1,3 +1,4 @@
+#pragma once
 #include "glm/ext/vector_float3.hpp"
 #include "shader.h"
 #include <cstddef>
@@ -23,12 +24,14 @@ public:
 
   Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices,
        std::vector<Texture> textures)
-      : vertices(vertices), indices(indices), textures(textures) {}
+      : vertices(vertices), indices(indices), textures(textures) {
+    setupMesh();
+  }
 
   void Draw(Shader &shader) {
-    unsigned int diffuseNr = 1;
-    unsigned int specularNr = 1;
-    for (unsigned int i; i < textures.size(); i++) {
+    unsigned int diffuseNr = 0;
+    unsigned int specularNr = 0;
+    for (unsigned int i = 0; i < textures.size(); i++) {
       glActiveTexture(GL_TEXTURE0 + i);
       std::string number;
       std::string name = textures[i].type;
@@ -37,7 +40,7 @@ public:
       } else if (name == "texture_specular") {
         number = std::to_string(specularNr++);
       }
-      shader.setFloat("material." + name + number, i);
+      shader.setInt("material." + name + "[" + number + "]", i);
       glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
     glActiveTexture(GL_TEXTURE0);
@@ -57,7 +60,6 @@ private:
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
                  &vertices[0], GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);

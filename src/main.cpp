@@ -1,11 +1,9 @@
+#include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
-#include "glm/trigonometric.hpp"
 #include "model.h"
+#include <complex>
 #include <cstdlib>
-#include <filesystem>
-#include <string>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "shader.h"
@@ -67,21 +65,15 @@ int main() {
 
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetCursorPosCallback(window, mouseCallback);
-
-  Shader shaderProgram("../shaders/shader.vert", "../shaders/shader.frag");
-  auto model = glm::mat4(1.0f);
-  auto view = glm::mat4(1.0f);
-  auto projection = glm::mat4(1.0f);
-  projection =
-      glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
-  stbi_set_flip_vertically_on_load(true);
   glEnable(GL_DEPTH_TEST);
 
-  Model BackPack(std::filesystem::path("../models/backpack/backpack.obj"));
-
-  // camera
+  // Model cube("../models/noiseCube/Untitled.obj");
+  Model backpack("../models/backpack/backpack.obj");
+  Shader basicShader("../shaders/shader.vert", "../shaders/shader.frag");
+  glm::mat4 model(1.0f);
   Camera cam;
+  glm::mat4 projection =
+      glm::perspective(cam.fov, 800.0f / 600.0f, 0.1f, 10.0f);
   float deltaTime = 0;
   float prevFrame = glfwGetTime();
   while (!glfwWindowShouldClose(window)) {
@@ -91,24 +83,15 @@ int main() {
     process_input(window);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    shaderProgram.use();
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(
-        model,
-        glm::vec3(
-            0.0f, 0.0f,
-            0.0f)); // translate it down so it's at the center of the scene
-    model = glm::scale(
-        model,
-        glm::vec3(4.0f, 4.0f,
-                  4.0f)); // it's a bit too big for our scene, so scale down
-    shaderProgram.setMat4f("model", model);
-    shaderProgram.setMat4f("view", view);
-    shaderProgram.setMat4f("projection", projection);
-    BackPack.Draw(shaderProgram);
     cam.move(window, deltaTime);
     cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
-    view = cam.lookAtMatrix();
+    auto view = cam.lookAtMatrix();
+    basicShader.use();
+    basicShader.setMat4f("model", model);
+    basicShader.setMat4f("view", view);
+    basicShader.setMat4f("projection", projection);
+    backpack.Draw(basicShader);
+    // cube.Draw(basicShader);
     glfwSwapBuffers(window);
     glfwPollEvents();
   }

@@ -47,7 +47,7 @@ public:
 
   void rotate(double *prevx, double *prevy, float x, float y) {
     yaw += (x - *prevx) * camSensitivity;
-    pitch += (y - *prevy) * camSensitivity;
+    pitch -= (y - *prevy) * camSensitivity;
     *prevx = x;
     *prevy = y;
   }

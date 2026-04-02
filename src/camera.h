@@ -15,6 +15,9 @@ public:
   glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f);
   float camSensitivity = 0.1;
   float fov = 45.0f;
+  float slowSpeed = 1.5f;
+  float fastSpeed = 10.0f;
+  bool moveFast = false;
 
   const glm::mat4 lookAtMatrix() {
     direction = glm::vec3(cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
@@ -42,7 +45,11 @@ public:
       return;
     }
     movementVector = glm::normalize(movementVector);
-    position += deltaTime * 1.5f * movementVector;
+    auto speed = slowSpeed;
+    if (moveFast) {
+      speed = fastSpeed;
+    }
+    position += deltaTime * speed * movementVector;
   }
 
   void rotate(double *prevx, double *prevy, float x, float y) {

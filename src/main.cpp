@@ -1,6 +1,8 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "glm/trigonometric.hpp"
 #include "model.h"
 #include <complex>
 #include <cstdlib>
@@ -66,14 +68,24 @@ int main() {
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetCursorPosCallback(window, mouseCallback);
   glEnable(GL_DEPTH_TEST);
-
-  // Model cube("../models/noiseCube/Untitled.obj");
+  stbi_set_flip_vertically_on_load_thread(true);
+  Model floor("../models/floor/floor.obj");
+  Model noiseCube("../models/noiseCube/Untitled.obj");
+  Model woodCube("../models/woodCube/woodCube.obj");
   Model backpack("../models/backpack/backpack.obj");
   Shader basicShader("../shaders/shader.vert", "../shaders/shader.frag");
-  glm::mat4 model(1.0f);
+  glm::mat4 floorModel(1.0f);
+  // floorModel = glm::scale(floorModel, glm::vec3(2.0f, 2.0f, 2.0f));
+  glm::mat4 noiseCubeModel(1.0f);
+  noiseCubeModel = glm::translate(noiseCubeModel, glm::vec3(0.0f, 2.0f, 0.0f));
+  glm::mat4 woodCubeModel(1.0f);
+  woodCubeModel = glm::translate(woodCubeModel, glm::vec3(1.0f, 2.0f, 2.0f));
+  glm::mat4 backpackModel(1.0f);
+  backpackModel = glm::translate(backpackModel, glm::vec3(3.0f, 1.85f, 0.0f));
+  backpackModel = glm::scale(backpackModel, glm::vec3(0.5f, 0.5f, 0.5f));
   Camera cam;
   glm::mat4 projection =
-      glm::perspective(cam.fov, 800.0f / 600.0f, 0.1f, 10.0f);
+      glm::perspective(glm::radians(cam.fov), 800.0f / 600.0f, 0.1f, 100.0f);
   float deltaTime = 0;
   float prevFrame = glfwGetTime();
   while (!glfwWindowShouldClose(window)) {
@@ -81,17 +93,26 @@ int main() {
     deltaTime = currentFrame - prevFrame;
     prevFrame = currentFrame;
     process_input(window);
+    cam.moveFast = false;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+      cam.moveFast = true;
+    }
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     cam.move(window, deltaTime);
     cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
     auto view = cam.lookAtMatrix();
     basicShader.use();
-    basicShader.setMat4f("model", model);
     basicShader.setMat4f("view", view);
     basicShader.setMat4f("projection", projection);
+    basicShader.setMat4f("model", backpackModel);
     backpack.Draw(basicShader);
-    // cube.Draw(basicShader);
+    basicShader.setMat4f("model", floorModel);
+    floor.Draw(basicShader);
+    basicShader.setMat4f("model", noiseCubeModel);
+    noiseCube.Draw(basicShader);
+    basicShader.setMat4f("model", woodCubeModel);
+    woodCube.Draw(basicShader);
     glfwSwapBuffers(window);
     glfwPollEvents();
   }

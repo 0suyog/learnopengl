@@ -153,6 +153,8 @@ int main() {
     // cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
     // auto view = cam.lookAtMatrix();
     raytracerShader.use();
+    float time = glfwGetTime();
+    raytracerShader.setFloat("time", time);
     glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     // commented out to amke a ray tracer shader
     // basicShader.use();

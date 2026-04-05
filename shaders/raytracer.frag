@@ -118,5 +118,5 @@ void main() {
   // return;
   // }
   // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
-  FragColor = vec4(gold_noise(coord.xy,time+0.4),gold_noise(coord.xy,time+0.2),gold_noise(coord.xy,time+0.1),1.0);
+  FragColor = vec4(gold_noise(FragPosition.xy,time),gold_noise(FragPosition.xy,time),gold_noise(FragPosition.xy,time),1.0);
 }

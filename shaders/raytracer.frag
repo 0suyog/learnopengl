@@ -69,6 +69,10 @@ float gold_noise(in vec2 xy, in float seed){
        return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
 }
 
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
 bool hitSphere(Sphere sphere, Ray r, out HitInfo ht) {
   vec3 direction = normalize(r.direction);
   float a = 1;
@@ -119,9 +123,9 @@ void main() {
   // }
   // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
 FragColor = vec4(
-    gold_noise(FragPosition.xy, 1.0),
-    gold_noise(FragPosition.xy,   300.0),
-    gold_noise(FragPosition.xy,   4.0),
+    rand(FragPosition.xy),
+    rand(FragPosition.xy),
+    rand(FragPosition.xy),
     1.0
 );
 }

@@ -3,9 +3,14 @@ in vec3 FragPosition;
 out vec4 FragColor;
 uniform float time;
 
+struct Material{
+  vec3 color; 
+};
+
 struct Sphere {
   vec3 origin;
   float radius;
+  Material mat;
 };
 
 struct Ray {
@@ -63,11 +68,11 @@ float mapToZeroToOne(float x, float max,float min){
 // - fastest static noise generator function (also runs at low precision)
 // - use with indicated fractional seeding method. 
 
-float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
-
-float gold_noise(in vec2 xy, in float seed){
-       return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
-}
+// float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
+//
+// float gold_noise(in vec2 xy, in float seed){
+//        return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
+// }
 
 float rand(vec2 co){
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -93,10 +98,40 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht) {
   // }
 }
 
-void depthLoop(Ray r, Sphere[3]world, int maxDepth){
-	 for (int i=0;i<maxDepth;i++){
-	 
+vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
+  vec3 color=vec3(1.0,1.0,1.0);
+	 for (int i=0;i<maxDepth+1;i++){
+	 if (i==maxDepth){
+		return vec3(0.0,0.0,0.0);
+	 }
+	 else{
+  HitInfo h;
+		HitInfo closestHit;
+		Sphere closestSphere;
+  float closest=1.0/0.0;
+  bool hitAnything=false;
+  for (int j=0;j<3;j++){
+
+  if (hitSphere( world[j], r,h) && h.t<closest) {
+			 closestHit=h;
+			 closest=h.t;
+				hitAnything=true;
+			 closestSphere=world[j];
+		  }
+	 }
+		if (!hitAnything){
+  return color*vec3(0.2,0.15,( r.direction.y+1 )*0.5);
+		}
+			 r.origin = rayAt(r,closestHit.t);
+r.direction = normalize(closestHit.normal + vec3(
+    rand(r.origin.xy + float(i) * 0.1),
+    rand(r.origin.xy + float(i) * 0.1 + 1.7),
+    rand(r.origin.xy + float(i) * 0.1 + 3.3)
+) * 2.0 - 1.0);
+		color=color*closestSphere.mat.color;
+		}
   }
+  return color;
 }
 
 void main() {
@@ -108,24 +143,31 @@ void main() {
   float focal_length = 1.0;
   vec3 viewPort_w = vec3(0.0, 0.0, -focal_length);
   vec3 cameraPosition = vec3(0.0, 0.0, 0.0);
-  Sphere s;
-  s.origin = vec3(0.0, 0.0, -5.0);
-  s.radius = 2.0;
+  Sphere s[3];
+  Material red;
+  red.color=vec3(1.0,0.0,0.0);
+  s[0].origin = vec3(-4.0, 0.0, -5.0);
+  s[0].radius = 2.0;
+  s[0].mat = red;
+  s[1].origin = vec3(-1.0, 0.0, -5.0);
+  s[1].radius = 2.0;
+  s[1].mat = red;
+  s[2].origin = vec3(3.0, 5.0, -5.0);
+  s[2].radius = 2.0;
+  s[2].mat = red;
   vec3 coord = FragPosition;
   coord.x *= (800.0 / 600.0);
   coord.z = -focal_length;
   vec3 rayDirection = normalize(coord - cameraPosition);
   Ray r = createRay(cameraPosition, rayDirection);
-  HitInfo h;
+  vec3 color = rayColor(r,s,10);
   // if (hitSphere(s, r,h)) {
   // FragColor = vec4(h.normal, 1.0f);
   // return;
   // }
   // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
 FragColor = vec4(
-    rand(FragPosition.xy),
-    rand(FragPosition.xy),
-    rand(FragPosition.xy),
+	 color,
     1.0
 );
 }

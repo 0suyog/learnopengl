@@ -13,6 +13,7 @@ struct Sphere {
   Material mat;
 };
 
+
 struct Ray {
   vec3 origin;
   vec3 direction;
@@ -75,7 +76,7 @@ float mapToZeroToOne(float x, float max,float min){
 // }
 
 float rand(vec2 co){
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+  return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 bool hitSphere(Sphere sphere, Ray r, out HitInfo ht) {
@@ -86,50 +87,49 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht) {
   float c = dot(co, co) - (sphere.radius * sphere.radius);
   float discriminant = (h * h) - (a * c);
   if (discriminant < 0) {
-    return false;
+	 return false;
   }
   float discriminantSqrt = sqrt(discriminant);
   float t = (h - discriminantSqrt) / a;
   // if (discriminant == 0) {
-    vec3 p = rayAt(r, t);
-    vec3 n = sphereNormalAt(sphere, p);
-    ht = newHitInfo(p, n, t);
-    return true;
+  vec3 p = rayAt(r, t);
+  vec3 n = sphereNormalAt(sphere, p);
+  ht = newHitInfo(p, n, t);
+  return true;
   // }
+}
+
+bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h){
+  HitInfo tempHit;
+  float closestSoFar=1.0/0.0;
+  bool hitAnything=false;
+  for (int i=0;i<3;i++){
+	 if (hitSphere(world[i],r,tempHit)){
+		hitAnything=true;
+		if (tempHit.t<closestSoFar){
+			 closestSoFar = tempHit.t;
+		  h=tempHit;
+		}
+	 }
+  }
+  return hitAnything;
 }
 
 vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
   vec3 color=vec3(1.0,1.0,1.0);
-	 for (int i=0;i<maxDepth+1;i++){
+  for (int i=0;i<maxDepth+1;i++){
 	 if (i==maxDepth){
 		return vec3(0.0,0.0,0.0);
 	 }
-	 else{
-  HitInfo h;
-		HitInfo closestHit;
-		Sphere closestSphere;
-  float closest=1.0/0.0;
-  bool hitAnything=false;
-  for (int j=0;j<3;j++){
-
-  if (hitSphere( world[j], r,h) && h.t<closest) {
-			 closestHit=h;
-			 closest=h.t;
-				hitAnything=true;
-			 closestSphere=world[j];
-		  }
+	 HitInfo h;
+	 if (!hitSpheres(world,r,h)){
+		return color*vec3(0.0,0.0,( r.direction.y+1 )*0.5);
 	 }
-		if (!hitAnything){
-  return color*vec3(0.2,0.15,( r.direction.y+1 )*0.5);
-		}
-			 r.origin = rayAt(r,closestHit.t);
-r.direction = normalize(closestHit.normal + vec3(
-    rand(r.origin.xy + float(i) * 0.1),
-    rand(r.origin.xy + float(i) * 0.1 + 1.7),
-    rand(r.origin.xy + float(i) * 0.1 + 3.3)
-) * 2.0 - 1.0);
-		color=color*closestSphere.mat.color;
-		}
+	 return ( h.normal+1 )*0.5;
+	 // return vec3(1.0,0.3,0.3);
+	 color*=vec3(1.0,0.3,0.3);
+	 r.origin = rayAt(r,h.t)+(h.normal*0.01);
+	 r.direction = vec3(rand(h.normal.xy),rand(h.normal.yz),rand(h.normal.zx));
   }
   return color;
 }
@@ -160,14 +160,14 @@ void main() {
   coord.z = -focal_length;
   vec3 rayDirection = normalize(coord - cameraPosition);
   Ray r = createRay(cameraPosition, rayDirection);
-  vec3 color = rayColor(r,s,10);
+  vec3 color = rayColor(r,s,3);
   // if (hitSphere(s, r,h)) {
   // FragColor = vec4(h.normal, 1.0f);
   // return;
   // }
   // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
-FragColor = vec4(
+  FragColor = vec4(
 	 color,
-    1.0
-);
+	 1.0
+  );
 }

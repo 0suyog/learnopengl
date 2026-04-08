@@ -32,13 +32,15 @@ struct HitInfo {
   vec3 position;
   vec3 normal;
   float t;
+  Material mat;
 };
 
-HitInfo newHitInfo(vec3 position, vec3 normal, float t) {
+HitInfo newHitInfo(vec3 position, vec3 normal, float t, Material mat) {
   HitInfo h;
   h.position = position;
   h.normal = normal;
   h.t = t;
+  h.mat=mat;
   return h;
 }
 
@@ -142,7 +144,7 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
   }
   vec3 p = rayAt(r, t);
   vec3 n = sphereNormalAt(sphere, p);
-  ht = newHitInfo(p, n, t);
+  ht = newHitInfo(p, n, t, sphere.mat);
   return true;
   // }
 }
@@ -175,9 +177,9 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 	 }
 	 // return ( h.normal+1 )*0.5;
 	 // return vec3(1.0,0.3,0.3);
-	 color*=0.5*vec3(1.0,0.3,0.3);
+	 color*= h.mat.color;
 	 r.origin = rayAt(r,h.t)+(h.normal*0.01);
-	 vec3 randVec = randVec3InHemisphere(r.origin.xy,h.normal);
+	 vec3 randVec = randVec3InHemisphere(r.origin.xx,h.normal);
 	 r.direction = normalize(h.normal + randVec);
   }
   return color;
@@ -196,31 +198,33 @@ vec3 multiSampleLoop(Sphere[3] world,int samplesPerPixel,vec3 origin, vec3 fragC
 }
 
 void main() {
-  float aspectRatio = float( width ) / float( height );
-  float focal_length = 1.0;
-  float viewPortHeight = 2.0*tan(vfov/2)*focal_length;
-  float viewPortWidth = aspectRatio * viewPortHeight;
-  vec3 viewPort_u = vec3(1.0, 0.0, 0.0)*viewPortWidth;
-  vec3 viewPort_v = vec3(0.0,-1.0, 0.0)*viewPortHeight;
+  // float aspectRatio = float( width ) / float( height );
+  // float focal_length = 1.0;
+  // float viewPortHeight = 2.0*tan(vfov/2)*focal_length;
+  // float viewPortWidth = aspectRatio * viewPortHeight;
+  // vec3 viewPort_u = vec3(1.0, 0.0, 0.0)*viewPortWidth;
+  // vec3 viewPort_v = vec3(0.0,-1.0, 0.0)*viewPortHeight;
   // vec3 delta_u = viewPort_u/width;
   // vec3 delta_v = viewPort_v/height;
-  vec3 viewPort_w = vec3(0.0, 0.0, -focal_length);
+  // vec3 viewPort_w = vec3(0.0, 0.0, -focal_length);
   // vec3 cameraPosition = vec3(0.0, 0.0, 0.0);
   // vec3 firstPixelLocation = camera_position + viewPort_w -(  viewPort_u/2 ) + (viewPort_v/2) + ( delta_u + delta_v )/2;
 // FragColor = vec4(width,width,width,1.0);
 //   return;
   Sphere s[3];
   Material red;
-  red.color=vec3(1.0,0.0,0.0);
+  Material green;
+  red.color=vec3(1.0,0.1,0.1);
+  green.color = vec3(0.1,0.5,0.1);
   s[0].origin = vec3(0.0, 0.0, -1.0);
   s[0].radius = 0.5;
   s[0].mat = red;
   s[1].origin = vec3(0.0, -100.5, -1.1);
   s[1].radius = 100.0;
-  s[1].mat = red;
+  s[1].mat = green;
   s[2].origin = vec3(3.0, 5.0, -5.0);
-  s[2].radius = 0.01;
-  s[2].mat = red;
+  s[2].radius = 1;
+  s[2].mat = green;
   vec3 coord = (FragPosition+1)*0.5;
   coord.x *= width; 
   coord.y*=height;

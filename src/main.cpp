@@ -140,7 +140,7 @@ int main() {
                        float(window_width) / float(window_width), 0.1f, 100.0f);
   float deltaTime = 0;
   float prevFrame = glfwGetTime();
-  int samplesPerPixel = 1;
+  int samplesPerPixel = 10;
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -162,18 +162,6 @@ int main() {
       samplesPerPixel -= 1;
       std::cerr << samplesPerPixel << std::endl;
     }
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-      camera_position += glm::vec3(0.0, 0.0, -0.1);
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-      camera_position += glm::vec3(0.0, 0.0, 0.1);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-      camera_position += glm::vec3(-0.1, 0.0, 0.0);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-      camera_position += glm::vec3(0.1, 0.0, 0.0);
-    }
     // if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
     //   std::cerr << "camera Pos: " << cam.position.x << " " << cam.position.y
     //             << " " << cam.position.z << std::endl;
@@ -187,6 +175,7 @@ int main() {
     // auto view = cam.lookAtMatrix();
     raytracerShader.use();
     cam.rotate(prevMouseX, prevMouseY, mousex, mousey);
+    cam.move(window, deltaTime);
     float time = glfwGetTime();
     raytracerShader.setFloat("time", time);
     raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
@@ -194,7 +183,6 @@ int main() {
     // raytracerShader.setInt("width", window_width);
     // raytracerShader.setInt("height", widnow_height);
     raytracerShader.setFloat("vfov", vfov);
-    raytracerShader.setVec3("camera_position", camera_position);
     glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     // commented out to amke a ray tracer shader
     // basicShader.use();

@@ -19,11 +19,12 @@ public:
   int height;
   float fov = 45.0f;
   glm::vec3 v = glm::vec3(0.0f, -1.0f, 0.0f);
+  glm::vec3 vup = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 w = glm::vec3(0.0f, 0.0f, -1.0f);
   glm::vec3 u = glm::vec3(1.0f, 0.0f, 0.0f);
   glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f);
   float camSensitivity = 0.1;
-  float slowSpeed = 1.5f;
+  float slowSpeed = 0.5f;
   float fastSpeed = 10.0f;
   bool moveFast = false;
   float focal_length = 1.0;
@@ -33,7 +34,13 @@ public:
       : shader(shader), width(windowWidth), height(windowHeight) {}
 
   void initCamera() {
-    w = glm::vec3(cos(glm::radians(yaw)), 0.0f, sin(glm::radians(yaw)));
+    aspectRatio = float(width) / float(height);
+    w = glm::vec3(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
+                  sin(glm::radians(pitch)),
+                  cos(glm::radians(pitch)) * sin(glm::radians(yaw)));
+    w = glm::normalize(w);
+    u = glm::normalize(glm::cross(w, vup)); // right
+    v = glm::cross(w, u);
     // v = glm::vec3(v, 1.0f);
     // u = lookAtMatrix() * glm::vec4(u, 1.0f);
     float viewPortHeight = 2.0 * tan(glm::radians(fov / 2)) * focal_length;
@@ -48,20 +55,13 @@ public:
         (viewPort_v / float(2)) + (delta_u + delta_v) / float(2);
 
     shader.use();
+    shader.setVec3("camera_position", position);
     shader.setInt("width", width);
     shader.setInt("height", height);
     shader.setVec3("delta_u", delta_u);
     shader.setVec3("delta_v", delta_v);
     shader.setVec3("firstPixelLocation", firstPixelLocation);
     shader.setFloat("focal_length", focal_length);
-  }
-
-  const glm::mat4 lookAtMatrix() {
-    w = glm::vec3(cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
-                  sin(glm::radians(pitch)),
-                  sin(glm::radians(yaw)) * cos(glm::radians(pitch)));
-    return glm::lookAt(position, position + w, v);
-    shader.use();
   }
 
   void move(GLFWwindow *window, float deltaTime) {
@@ -73,23 +73,24 @@ public:
       movementVector -= w;
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-      movementVector += glm::cross(v, w);
+      movementVector -= u;
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-      movementVector -= glm::cross(v, w);
+      movementVector += u;
+    }
+    auto speed = slowSpeed;
+    if (moveFast) {
+      speed = fastSpeed;
+      moveFast = false;
     }
     if (movementVector.x == 0.0 && movementVector.y == 0.0 &&
         movementVector.z == 0) {
       return;
     }
     movementVector = glm::normalize(movementVector);
-    auto speed = slowSpeed;
-    if (moveFast) {
-      speed = fastSpeed;
-    }
     position += deltaTime * speed * movementVector;
-    shader.use();
-    shader.setVec3("camera_position", position);
+    std::cerr << position.x << " " << position.y << " " << position.z << "\n";
+    initCamera();
   }
 
   void rotate(double prevx, double prevy, float x, float y) {

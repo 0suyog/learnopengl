@@ -13,12 +13,17 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <ostream>
-#include "camera.h"
+#include "rayTracingCamera.h"
 
 glm::vec3 movementVector;
 
+int window_width = 800;
+int widnow_height = 600;
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
+  window_width = width;
+  widnow_height = height;
 }
 
 void process_input(GLFWwindow *window) {
@@ -54,8 +59,8 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window =
-      glfwCreateWindow(800, 600, "LearnOpenglBySuyog", NULL, NULL);
+  GLFWwindow *window = glfwCreateWindow(window_width, widnow_height,
+                                        "LearnOpenglBySuyog", NULL, NULL);
   if (window == NULL) {
     std::cerr << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
@@ -121,14 +126,21 @@ int main() {
   Shader raytracerShader("../shaders/raytracer.vert",
                          "../shaders/raytracer.frag");
 
-  Camera cam;
-  cam.position = glm::vec3(12.597f, 5.83392f, 1.86564f);
-  cam.yaw = -185.9f;
-  cam.pitch = -23.3f;
+  float focal_length = 1;
+  float vfov = glm::radians(90.0);
+  glm::vec3 camera_position = glm::vec3(0.0, 0.0, 0.0);
+
+  RayTracingCamera cam(raytracerShader, window_width, window_width);
+  cam.initCamera();
+  cam.position = glm::vec3(0.0f, 0.0f, 0.0f);
+  cam.yaw = 90.0f;
+  cam.pitch = 90.0f;
   glm::mat4 projection =
-      glm::perspective(glm::radians(cam.fov), 800.0f / 600.0f, 0.1f, 100.0f);
+      glm::perspective(glm::radians(cam.fov),
+                       float(window_width) / float(window_width), 0.1f, 100.0f);
   float deltaTime = 0;
   float prevFrame = glfwGetTime();
+  int samplesPerPixel = 1;
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -138,8 +150,29 @@ int main() {
     prevFrame = currentFrame;
     process_input(window);
     // cam.moveFast = false;
+    // cam.move(window, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
       cam.moveFast = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      samplesPerPixel += 1;
+      std::cerr << samplesPerPixel << std::endl;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      samplesPerPixel -= 1;
+      std::cerr << samplesPerPixel << std::endl;
+    }
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+      camera_position += glm::vec3(0.0, 0.0, -0.1);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+      camera_position += glm::vec3(0.0, 0.0, 0.1);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+      camera_position += glm::vec3(-0.1, 0.0, 0.0);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+      camera_position += glm::vec3(0.1, 0.0, 0.0);
     }
     // if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
     //   std::cerr << "camera Pos: " << cam.position.x << " " << cam.position.y
@@ -153,8 +186,15 @@ int main() {
     // cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
     // auto view = cam.lookAtMatrix();
     raytracerShader.use();
+    cam.rotate(prevMouseX, prevMouseY, mousex, mousey);
     float time = glfwGetTime();
     raytracerShader.setFloat("time", time);
+    raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
+    // raytracerShader.setInt("focal_length", focal_length);
+    // raytracerShader.setInt("width", window_width);
+    // raytracerShader.setInt("height", widnow_height);
+    raytracerShader.setFloat("vfov", vfov);
+    raytracerShader.setVec3("camera_position", camera_position);
     glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     // commented out to amke a ray tracer shader
     // basicShader.use();
@@ -168,6 +208,8 @@ int main() {
     // noiseCube.Draw(basicShader);
     // basicShader.setMat4f("model", woodCubeModel);
     // woodCube.Draw(basicShader);
+    prevMouseX = mousex;
+    prevMouseY = mousey;
     glfwSwapBuffers(window);
     glfwPollEvents();
   }

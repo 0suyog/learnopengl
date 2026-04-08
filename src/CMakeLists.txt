@@ -16,7 +16,7 @@ target_link_directories(common INTERFACE ${CMAKE_SOURCE_DIR}/../Libs)
 
 target_link_libraries(common INTERFACE glfw3 GL dl pthread X11 assimp)
 
-file(GLOB SHADERS "../shaders/*")
+file(GLOB SHADERS CONFIGURE_DEPENDS "../shaders/*")
 
 add_executable(opengltut ${CMAKE_CURRENT_SOURCE_DIR}/glad.cpp
 								 ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${SHADERS})
@@ -35,7 +35,7 @@ add_custom_target(
 add_custom_target(
   run
   COMMAND $<TARGET_FILE:opengltut>
-  DEPENDS opengltut
+  DEPENDS opengltut ${SHADERS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Running application")
 

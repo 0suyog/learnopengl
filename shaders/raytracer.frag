@@ -179,6 +179,7 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 	 // return vec3(1.0,0.3,0.3);
 	 color*= h.mat.color;
 	 r.origin = rayAt(r,h.t)+(h.normal*0.01);
+
 	 vec3 randVec = randVec3InHemisphere(r.origin.xx,h.normal);
 	 r.direction = normalize(h.normal + randVec);
   }

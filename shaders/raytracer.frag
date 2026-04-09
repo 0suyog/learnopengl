@@ -63,6 +63,10 @@ float mapToZeroToOne(float x, float max,float min){
   return ( x-min )/(max-min);
 }
 
+bool isFrontFace(vec3 incomingDir,vec3 normal){
+  return dot(incomingDir,normal)<0;
+}
+
 // LCG random generator(doesnt work as gpu is stateless)
 // int seed=88;
 // float rand(){
@@ -82,18 +86,26 @@ float mapToZeroToOne(float x, float max,float min){
 
 // float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
 //
-// float gold_noise(in vec2 xy, in float seed){
-//        return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
+// float rand(in vec2 xy){
+//        return fract(tan(distance(xy*PHI, xy)*232.2983)*xy.x);
 // }
 
-float rand( vec2 p )
-{
-    vec2 K1 = vec2(
-        23.14069263277926, // e^pi (Gelfond's constant)
-         2.665144142690225 // 2^sqrt(2) (Gelfondâ€“Schneider constant)
-    );
-    return fract( cos( dot(p,K1) ) * 12345.6789 );
+// float rand( vec2 p )
+// {
+//     vec2 K1 = vec2(
+//         23.14069263277926, // e^pi (Gelfond's constant)
+//          2.665144142690225 // 2^sqrt(2) (Gelfondâ€“Schneider constant)
+//     );
+//     return fract( cos( dot(p,K1) ) * 12345.6789 );
+// }
+float rand(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 78.233);
+    return fract(p.x * p.y);
 }
+// float rand(vec2 p) {
+//     return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
+// }
 
 vec3 randVec3(vec2 seed){
   return vec3(rand(seed.xy),rand(seed.yx),rand(seed.yx+seed.xy));
@@ -104,11 +116,16 @@ vec2 randVec2(vec2 seed){
 }
 
 vec3 randVec3InSphere(vec2 seed){
+  int count = 0;
   while(true){
-	 vec3 randomVec = ( randVec3(seed)*2.0 )+1.0;
-	 if (length(randomVec)<=1){
-		if (length(randomVec) < 1e-6) return vec3(1.0, 0.0, 0.0); 
+	 vec3 randomVec = (randVec3(seed)-0.5)*2;
+	 float len = length(randomVec);
+	 if (len<=1){
+		if (len < 1e-6) return vec3(1.0, 0.0, 0.0); 
 		return randomVec;
+	 }
+	 if (count > 10){
+	  return vec3(1.0, 0.0, 0.0); 
 	 }
   }
 }
@@ -144,6 +161,7 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
   }
   vec3 p = rayAt(r, t);
   vec3 n = sphereNormalAt(sphere, p);
+  n = isFrontFace(r.direction,n) ? n: -n;
   ht = newHitInfo(p, n, t, sphere.mat);
   return true;
   // }
@@ -179,9 +197,8 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 	 // return vec3(1.0,0.3,0.3);
 	 color*= h.mat.color;
 	 r.origin = rayAt(r,h.t)+(h.normal*0.01);
-
-	 vec3 randVec = randVec3InHemisphere(r.origin.xx,h.normal);
-	 r.direction = normalize(h.normal + randVec);
+	 vec3 randVec = randVec3InHemisphere(r.origin.xy+h.normal.xy,h.normal);
+	 r.direction = normalize(randVec);
   }
   return color;
 }
@@ -189,8 +206,7 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 vec3 multiSampleLoop(Sphere[3] world,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
-	 // random point in a -0.5 to 0.5 square
-	 vec3 randomSample = vec3(((randVec2(fragCoord.xy+i)*2 )-1 )*0.001,0.0);
+	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5)*0.008,0.0);
 	 vec3 rayDir = normalize(( fragCoord-origin )+randomSample);
 	 Ray r = createRay(origin,rayDir);
 	 color+= rayColor(r,world,2);

@@ -34,7 +34,7 @@ add_custom_target(
 
 add_custom_target(
   run
-  COMMAND $<TARGET_FILE:opengltut>
+  COMMAND mangohud $<TARGET_FILE:opengltut>
   DEPENDS opengltut ${SHADERS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Running application")

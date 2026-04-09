@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <system_error>
+#include "glm/common.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -89,7 +90,6 @@ public:
     }
     movementVector = glm::normalize(movementVector);
     position += deltaTime * speed * movementVector;
-    std::cerr << position.x << " " << position.y << " " << position.z << "\n";
     initCamera();
   }
 
@@ -98,7 +98,16 @@ public:
       return;
     }
     yaw += (x - prevx) * camSensitivity;
-    pitch -= (y - prevy) * camSensitivity;
+    pitch -= ((y - prevy) * camSensitivity);
+    initCamera();
+  }
+
+  void handleWindowSizeChange(int window_width, int window_height) {
+    if (window_width == width && window_height == height) {
+      return;
+    }
+    width = window_width;
+    height = window_height;
     initCamera();
   }
 

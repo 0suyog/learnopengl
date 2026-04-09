@@ -132,6 +132,7 @@ int main() {
 
   RayTracingCamera cam(raytracerShader, window_width, window_width);
   cam.initCamera();
+  cam.handleWindowSizeChange(window_width, widnow_height);
   cam.position = glm::vec3(0.0f, 0.0f, 0.0f);
   cam.yaw = 90.0f;
   cam.pitch = 90.0f;

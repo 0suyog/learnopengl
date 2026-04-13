@@ -20,6 +20,7 @@ const uint LIGHT = 4u;
 struct Material{
   uint type;
   vec3 albedo;
+  vec3 emission;
   float fuzz;
 };
 
@@ -28,6 +29,7 @@ struct Sphere {
   float radius;
   Material mat;
 };
+
 
 
 struct Ray {
@@ -106,14 +108,14 @@ bool isFrontFace(vec3 incomingDir,vec3 normal){
 //     );
 //     return fract( cos( dot(p,K1) ) * 12345.6789 );
 // }
-float rand(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 78.233);
-    return fract(p.x * p.y);
-}
 // float rand(vec2 p) {
-//     return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
+//     p = fract(p * vec2(123.34, 456.21));
+//     p += dot(p, p + 78.233);
+//     return fract(p.x * p.y);
 // }
+float rand(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
+}
 
 vec3 randVec3(vec2 seed){
   return vec3(rand(seed.xy),rand(seed.yx),rand(seed.yx+seed.xy));
@@ -221,6 +223,18 @@ bool scatter(Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
   }
 }
 
+bool emit(Ray r_in,HitInfo h, out vec3 emitted){
+  switch(h.mat.type){
+	 case(LIGHT):{
+		emitted = h.mat.emission;
+		return true;
+	 }
+	 default:{
+		return false;
+	 }
+  }
+}
+
 
 vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
   vec3 color=vec3(1.0,1.0,1.0);
@@ -230,17 +244,25 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 	 }
 	 HitInfo h;
 	 if (!hitSpheres(world,r,h)){
-		return color*vec3(1.0,1.0,( r.direction.y+1 )*0.5);
+		// return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
+  return vec3(1.0,1.0,1.0);
 	 }
 	 // return ( h.normal+1 )*0.5;
 	 // return vec3(1.0,0.3,0.3);
-	 vec3 albedo;
-	 Ray scatteredRay;
-	 if (!scatter(r,h,albedo,scatteredRay)){
-		return color;
-	 }
 	 if (h.mat.type==NORMAL){
-		return ( h.normal+1 )*0.5;
+		return (normalize(h.normal)+1 )*0.5;
+	 }
+	 vec3 albedo;
+	 vec3 emission;
+	 Ray scatteredRay;
+	 // float em = float( emit(r,h,emission) );
+	 // return vec3(em,em,em);
+	 // if (emit(r,h,emission)){
+	 // return color+emission;
+	 // }
+	 if (!scatter(r,h,albedo,scatteredRay)){
+  // return vec3(0.0,0.0,0.0);
+		return color;
 	 }
 	 color*= albedo;
 	 r=scatteredRay;
@@ -278,22 +300,26 @@ void main() {
 //   return;
   Sphere s[3];
   Material red;
-  red.type=NORMAL;
+  red.type=LAMBERTIAN;
   red.fuzz=0.2;
   Material green;
-  green.type=METAL;
-  green.fuzz=0;
-  red.albedo=vec3(0.58, 0.173, 0.259);
+  green.type=LAMBERTIAN;
+  green.fuzz=0.1;
+  Material light;
+  light.type=LIGHT;
+  light.albedo=vec3(0.58, 0.173, 0.259);
+  red.albedo=vec3(1.0, 0.173, 0.259);
   green.albedo = vec3( 0.204, 0.651, 0.227 );
+  light.emission = vec3(15.0,15.0,15.0);
   s[0].origin = vec3(0.0, 0.0, -1.0);
   s[0].radius = 0.5;
   s[0].mat = red;
   s[1].origin = vec3(0.0, -100.5, -1.1);
   s[1].radius = 100.0;
   s[1].mat = green;
-  s[2].origin = vec3(3.0, 5.0, -5.0);
+  s[2].origin = vec3(3.0, 1.0, -2.0);
   s[2].radius = 1;
-  s[2].mat = green;
+  s[2].mat = light;
   vec3 coord = (FragPosition+1)*0.5;
   coord.x *= width; 
   coord.y*=height;

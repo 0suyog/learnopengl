@@ -30,7 +30,25 @@ struct Sphere {
   Material mat;
 };
 
+struct Quad {
+  vec3 bottomLeft;
+  vec3 u;
+  vec3 v;
+  vec3 n;
+  // the D of Ax+By+Cz=D where (A,B,C) is normal and (x,y,z) is the point so it is dot(n,bottomLeft)
+  float D;
+  Material mat;
+};
 
+Quad CreateQuad(vec3 bottomLeft, vec3 u, vec3 v){
+  Quad q;
+  q.bottomLeft = bottomLeft;
+  q.u=u;
+  q.v=v;
+  q.n=cross(u,v);
+  q.D = dot(q.n,bottomLeft);
+  return q;
+}
 
 struct Ray {
   vec3 origin;
@@ -148,6 +166,8 @@ vec3 randVec3InHemisphere(vec2 seed, vec3 normal){
   return randomVec;
 }
 
+vec2 gSeed;
+
 
 bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
   vec3 direction = normalize(r.direction);
@@ -177,6 +197,22 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
   return true;
 }
 
+bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
+  float denom = dot(q.n,r.direction);
+  if (denom <= 1e-8){
+		return false;
+  }
+  float np = dot(q.n,r.origin);
+  float t = (q.D-np)/denom;
+  if (t>=closestHit){
+	 return false;
+  }
+  vec3 p = rayAt(r,t);
+  vec3 n = isFrontFace(r.direction,q.n)?q.n:-q.n;
+  ht = newHitInfo(p, n, t, q.mat);
+  return true;
+}
+
 bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h){
   HitInfo tempHit;
   float closestSoFar=1.0/0.0;
@@ -193,8 +229,24 @@ bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h){
   return hitAnything;
 }
 
-vec3 lambertianReflection(vec3 normal){
-	 vec3 randVec = randVec3InHemisphere(vec2(fract(normal.x*3298),fract(normal.y*8738)),normal);
+bool hitQuads(Quad[3] world,Ray r,inout HitInfo h){
+  HitInfo tempHit;
+  float closestSoFar=1.0/0.0;
+  bool hitAnything=false;
+  for (int i=0;i<3;i++){
+	 if (hitQuad(world[i],r,tempHit, closestSoFar)){
+		hitAnything=true;
+		if (tempHit.t<closestSoFar){
+			 closestSoFar = tempHit.t;
+		  h=tempHit;
+		}
+	 }
+  }
+  return hitAnything;
+}
+
+vec3 lambertianReflection(vec3 normal,vec2 seed){
+	 vec3 randVec = randVec3InHemisphere(seed,normal);
   return normalize(randVec);
 }
 
@@ -207,7 +259,7 @@ bool scatter(Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
   switch(h.mat.type){
 	 case (LAMBERTIAN):{
 		scattered.origin = h.position;
-		scattered.direction = lambertianReflection(h.normal);
+		scattered.direction = lambertianReflection(h.normal,gSeed);
 		albedo = h.mat.albedo;
 		return true;
 	 };
@@ -223,29 +275,31 @@ bool scatter(Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
   }
 }
 
-bool emit(Ray r_in,HitInfo h, out vec3 emitted){
+vec3 emit(Ray r_in,HitInfo h){
   switch(h.mat.type){
 	 case(LIGHT):{
-		emitted = h.mat.emission;
-		return true;
+		return h.mat.emission;
 	 }
 	 default:{
-		return false;
+		 return vec3(0.0,0.0,0.0);
 	 }
   }
 }
 
 
 vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
-  vec3 color=vec3(1.0,1.0,1.0);
+  vec3 color = vec3(0.0,0.0,0.0);
+  vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
+	 gSeed+=rand(vec2(i*53,i*37));
 	 if (i==maxDepth){
-		return vec3(0.0,0.0,0.0);
+		return color;
+		// return vec3(0.0,0.0,0.0);
 	 }
 	 HitInfo h;
 	 if (!hitSpheres(world,r,h)){
 		// return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
-  return vec3(1.0,1.0,1.0);
+  return throughPut* vec3(1.0,0.3,0.2);
 	 }
 	 // return ( h.normal+1 )*0.5;
 	 // return vec3(1.0,0.3,0.3);
@@ -255,20 +309,13 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 	 vec3 albedo;
 	 vec3 emission;
 	 Ray scatteredRay;
-	 // float em = float( emit(r,h,emission) );
-	 // return vec3(em,em,em);
-	 // if (emit(r,h,emission)){
-	 // return color+emission;
-	 // }
+	 emission =  emit(r,h);
+	 color+= throughPut*emission;
 	 if (!scatter(r,h,albedo,scatteredRay)){
-  // return vec3(0.0,0.0,0.0);
 		return color;
 	 }
-	 color*= albedo;
+	 throughPut *= albedo;
 	 r=scatteredRay;
-	 // r.origin = rayAt(r,h.t)+(h.normal*0.01);
-	 // vec3 randVec = randVec3InHemisphere(r.origin.xy+h.normal.xy,h.normal);
-	 // r.direction = normalize(randVec);
   }
   return color;
 }
@@ -276,28 +323,19 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 vec3 multiSampleLoop(Sphere[3] world,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
+	 gSeed = fragCoord.xy +rand(vec2(fragCoord.x+ i*37,fragCoord.y+i*67));
 	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5)*0.008,0.0);
 	 vec3 rayDir = normalize(( fragCoord-origin )+randomSample);
 	 Ray r = createRay(origin,rayDir);
 	 color+= rayColor(r,world,3);
   }
+  if (color.x>=1.0/0.0||color.y>=1.0/0.0||color.z>=1.0/0.0){
+	 color = vec3(0.0, 1, 0.0);
+  }
   return color/samplesPerPixel;
 }
 
 void main() {
-  // float aspectRatio = float( width ) / float( height );
-  // float focal_length = 1.0;
-  // float viewPortHeight = 2.0*tan(vfov/2)*focal_length;
-  // float viewPortWidth = aspectRatio * viewPortHeight;
-  // vec3 viewPort_u = vec3(1.0, 0.0, 0.0)*viewPortWidth;
-  // vec3 viewPort_v = vec3(0.0,-1.0, 0.0)*viewPortHeight;
-  // vec3 delta_u = viewPort_u/width;
-  // vec3 delta_v = viewPort_v/height;
-  // vec3 viewPort_w = vec3(0.0, 0.0, -focal_length);
-  // vec3 cameraPosition = vec3(0.0, 0.0, 0.0);
-  // vec3 firstPixelLocation = camera_position + viewPort_w -(  viewPort_u/2 ) + (viewPort_v/2) + ( delta_u + delta_v )/2;
-// FragColor = vec4(width,width,width,1.0);
-//   return;
   Sphere s[3];
   Material red;
   red.type=LAMBERTIAN;
@@ -317,8 +355,8 @@ void main() {
   s[1].origin = vec3(0.0, -100.5, -1.1);
   s[1].radius = 100.0;
   s[1].mat = green;
-  s[2].origin = vec3(3.0, 1.0, -2.0);
-  s[2].radius = 1;
+  s[2].origin = vec3(0, 7.0, 0.0);
+  s[2].radius = 2;
   s[2].mat = light;
   vec3 coord = (FragPosition+1)*0.5;
   coord.x *= width; 

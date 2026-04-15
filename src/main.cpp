@@ -18,12 +18,12 @@
 glm::vec3 movementVector;
 
 int window_width = 800;
-int widnow_height = 600;
+int window_height = 600;
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
   window_width = width;
-  widnow_height = height;
+  window_height = height;
 }
 
 void process_input(GLFWwindow *window) {
@@ -59,7 +59,7 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window = glfwCreateWindow(window_width, widnow_height,
+  GLFWwindow *window = glfwCreateWindow(window_width, window_height,
                                         "LearnOpenglBySuyog", NULL, NULL);
   if (window == NULL) {
     std::cerr << "Failed to create GLFW window" << std::endl;
@@ -123,8 +123,50 @@ int main() {
                GL_STATIC_DRAW);
   glEnableVertexAttribArray(0);
 
+  // framebuffer for raytracing mainly for temporal accumulation
+  unsigned int raytracerFBO;
+  glGenFramebuffers(1, &raytracerFBO);
+  glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);
+
+  // texture attachment for fraebuffer
+  unsigned int rayTracerTexture;
+  glGenTextures(1, &rayTracerTexture);
+  glBindTexture(GL_TEXTURE_2D, rayTracerTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, window_width, window_height, 0, GL_RGB,
+               GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         rayTracerTexture, 0);
+
+  // renderbufferobject for depth and stencil testing
+  unsigned int raytracerRBO;
+  glGenRenderbuffers(1, &raytracerRBO);
+  glBindRenderbuffer(GL_RENDERBUFFER, raytracerRBO);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width,
+                        window_height);
+  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, raytracerRBO);
+
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    std::cerr << "ERROR:FRAMEBUFFER: FRAMEBUFFER ISNOT COMPLETE" << std::endl;
+  }
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, rayTracerTexture);
+
   Shader raytracerShader("../shaders/raytracer.vert",
                          "../shaders/raytracer.frag");
+  raytracerShader.use();
+  raytracerShader.setInt("prevTexture", 0);
+  Shader displayShader("../shaders/rayTracerDisplay.vert",
+                       "../shaders/rayTracerDisplay.frag");
+  displayShader.use();
+  displayShader.setInt("rayTracedScene", 0);
+  glBindTexture(GL_TEXTURE_2D, rayTracerTexture);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   float focal_length = 1;
   float vfov = glm::radians(90.0);
@@ -132,8 +174,8 @@ int main() {
 
   RayTracingCamera cam(raytracerShader, window_width, window_width);
   cam.initCamera();
-  cam.handleWindowSizeChange(window_width, widnow_height);
-  cam.position = glm::vec3(0.0f, 0.0f, 0.0f);
+  cam.handleWindowSizeChange(window_width, window_height);
+  cam.position = glm::vec3(278, 278, -800.0);
   cam.yaw = 90.0f;
   cam.pitch = 90.0f;
   glm::mat4 projection =
@@ -144,8 +186,8 @@ int main() {
   int samplesPerPixel = 10;
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
   while (!glfwWindowShouldClose(window)) {
+    glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - prevFrame;
     prevFrame = currentFrame;
@@ -169,7 +211,7 @@ int main() {
     //   std::cerr << "Yaw: " << cam.yaw << std::endl;
     //   std::cerr << "Pitch: " << cam.pitch << std::endl;
     // }
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_DEPTH_BUFFER_BIT);
     // cam.move(window, deltaTime);
     // cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
@@ -185,6 +227,13 @@ int main() {
     // raytracerShader.setInt("height", widnow_height);
     raytracerShader.setFloat("vfov", vfov);
     glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    displayShader.use();
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
     // commented out to amke a ray tracer shader
     // basicShader.use();
     // basicShader.setMat4f("view", view);

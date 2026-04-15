@@ -35,6 +35,7 @@ public:
       : shader(shader), width(windowWidth), height(windowHeight) {}
 
   void initCamera() {
+    frame = 1;
     aspectRatio = float(width) / float(height);
     w = glm::vec3(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
                   sin(glm::radians(pitch)),
@@ -94,6 +95,8 @@ public:
   }
 
   void rotate(double prevx, double prevy, float x, float y) {
+    shader.setUInt("frame", frame);
+    frame++;
     if (x == prevx && y == prevy) {
       return;
     }
@@ -112,4 +115,5 @@ public:
   }
 
 private:
+  uint frame = 1;
 };

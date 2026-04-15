@@ -11,11 +11,14 @@ uniform vec3 camera_position;
 uniform vec3 delta_u;
 uniform vec3 delta_v;
 uniform vec3 firstPixelLocation;
+uniform sampler2D prevTexture;
+uniform uint frame;
 
 const uint LAMBERTIAN = 1u;
 const uint METAL = 2u;
 const uint NORMAL = 3u;
 const uint LIGHT = 4u;
+
 
 struct Material{
   uint type;
@@ -213,9 +216,9 @@ bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
   return true;
 }
 
-bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h){
+bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
-  float closestSoFar=1.0/0.0;
+  float closestSoFar=closest;
   bool hitAnything=false;
   for (int i=0;i<3;i++){
 	 if (hitSphere(world[i],r,tempHit, closestSoFar)){
@@ -229,9 +232,9 @@ bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h){
   return hitAnything;
 }
 
-bool hitQuads(Quad[3] world,Ray r,inout HitInfo h){
+bool hitQuads(Quad[6] world,Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
-  float closestSoFar=1.0/0.0;
+  float closestSoFar=closest;
   bool hitAnything=false;
   for (int i=0;i<3;i++){
 	 if (hitQuad(world[i],r,tempHit, closestSoFar)){
@@ -259,13 +262,13 @@ bool scatter(Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
   switch(h.mat.type){
 	 case (LAMBERTIAN):{
 		scattered.origin = h.position;
-		scattered.direction = lambertianReflection(h.normal,gSeed);
+		scattered.direction = lambertianReflection(h.normal,gSeed+time);
 		albedo = h.mat.albedo;
 		return true;
 	 };
 	 case (METAL):{
 		scattered.origin = h.position;
-		scattered.direction = normalize(reflect(r_in.direction, h.normal)+(randVec3InSphere((h.position+h.normal).xy)*h.mat.fuzz*0.5));
+		scattered.direction = normalize(reflect(r_in.direction, h.normal)+(randVec3InSphere((h.position+h.normal+time).xy)*h.mat.fuzz*0.5));
 		albedo = h.mat.albedo;
 		return true;
 	 };
@@ -287,7 +290,7 @@ vec3 emit(Ray r_in,HitInfo h){
 }
 
 
-vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
+vec3 rayColor(Ray r, Sphere[3]world,Quad[6] quads, int maxDepth){
   vec3 color = vec3(0.0,0.0,0.0);
   vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
@@ -296,10 +299,21 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
 		return color;
 		// return vec3(0.0,0.0,0.0);
 	 }
+	 bool hitAnything=false;
 	 HitInfo h;
-	 if (!hitSpheres(world,r,h)){
+	 if (hitSpheres(world,r,h,1.0/0.0)){
+		 hitAnything=true; 
 		// return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
-  return throughPut* vec3(1.0,0.3,0.2);
+	 }
+	 float closest = 1.0/0.0;
+	 if(hitAnything){
+		closest = h.t;
+	 }
+	 if(hitQuads(quads,r,h,closest)){
+		hitAnything=true;
+	 }
+	 if(!hitAnything){
+		return vec3(0.0);
 	 }
 	 // return ( h.normal+1 )*0.5;
 	 // return vec3(1.0,0.3,0.3);
@@ -320,14 +334,14 @@ vec3 rayColor(Ray r, Sphere[3]world, int maxDepth){
   return color;
 }
 
-vec3 multiSampleLoop(Sphere[3] world,int samplesPerPixel,vec3 origin, vec3 fragCoord){
+vec3 multiSampleLoop(Sphere[3] world,Quad[6] q,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
 	 gSeed = fragCoord.xy +rand(vec2(fragCoord.x+ i*37,fragCoord.y+i*67));
 	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5)*0.008,0.0);
 	 vec3 rayDir = normalize(( fragCoord-origin )+randomSample);
 	 Ray r = createRay(origin,rayDir);
-	 color+= rayColor(r,world,3);
+	 color+= rayColor(r,world,q,3);
   }
   if (color.x>=1.0/0.0||color.y>=1.0/0.0||color.z>=1.0/0.0){
 	 color = vec3(0.0, 1, 0.0);
@@ -337,17 +351,20 @@ vec3 multiSampleLoop(Sphere[3] world,int samplesPerPixel,vec3 origin, vec3 fragC
 
 void main() {
   Sphere s[3];
+  Material white;
+  white.type=LAMBERTIAN;
+  white.albedo=vec3(0.73,0.73,0.73);
   Material red;
-  red.type=LAMBERTIAN;
+  red.type=METAL;
   red.fuzz=0.2;
   Material green;
-  green.type=LAMBERTIAN;
+  green.type=METAL;
   green.fuzz=0.1;
   Material light;
   light.type=LIGHT;
   light.albedo=vec3(0.58, 0.173, 0.259);
-  red.albedo=vec3(1.0, 0.173, 0.259);
-  green.albedo = vec3( 0.204, 0.651, 0.227 );
+  red.albedo=vec3(0.65,0.5,0.5);
+  green.albedo = vec3( 0.12,0.45,0.15 );
   light.emission = vec3(15.0,15.0,15.0);
   s[0].origin = vec3(0.0, 0.0, -1.0);
   s[0].radius = 0.5;
@@ -358,6 +375,58 @@ void main() {
   s[2].origin = vec3(0, 7.0, 0.0);
   s[2].radius = 2;
   s[2].mat = light;
+
+  Quad q[6];
+
+  // Left wall (green)
+  q[0] = CreateQuad(
+	 vec3(555, 0, 0),
+	 vec3(0, 555, 0),
+	 vec3(0, 0, 555)
+  );
+  q[0].mat = green;
+
+  // Right wall (red)
+  q[1] = CreateQuad(
+	 vec3(0, 0, 0),
+	 vec3(0, 555, 0),
+	 vec3(0, 0, 555)
+  );
+  q[1].mat = red;
+
+  // Light (ceiling rectangle)
+  q[2] = CreateQuad(
+	 vec3(343, 554, 332),
+	 vec3(-130, 0, 0),
+	 vec3(0, 0, -105)
+  );
+  q[2].mat = light;
+
+  // Floor
+  q[3] = CreateQuad(
+	 vec3(0, 0, 0),
+	 vec3(555, 0, 0),
+	 vec3(0, 0, 555)
+  );
+  q[3].mat = white;
+
+  // Ceiling
+  q[4] = CreateQuad(
+	 vec3(555, 555, 555),
+	 vec3(-555, 0, 0),
+	 vec3(0, 0, -555)
+  );
+  q[4].mat = white;
+
+  // Back wall
+  q[5] = CreateQuad(
+	 vec3(0, 0, 555),
+	 vec3(555, 0, 0),
+	 vec3(0, 555, 0)
+  );
+  q[5].mat = white;
+
+
   vec3 coord = (FragPosition+1)*0.5;
   coord.x *= width; 
   coord.y*=height;
@@ -365,15 +434,14 @@ void main() {
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
   // vec3 rayDirection = normalize(coord - cameraPosition);
   // Ray r = createRay(cameraPosition, rayDirection);
-  vec3 color = multiSampleLoop(s, uSamplesPerPixel,camera_position,viewPortPixelCoord);
+  vec3 color = multiSampleLoop(s,q, uSamplesPerPixel,camera_position,viewPortPixelCoord);
   // vec3 color = rayColor(r,s,2);
   // if (hitSphere(s, r,h)) {
   // FragColor = vec4(h.normal, 1.0f);
   // return;
   // }
   // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
-  FragColor = vec4(
-	 color,
-	 1.0
-  );
+  vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
+  FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
+  // FragColor = vec4(vec3(frame),1.0);
 }

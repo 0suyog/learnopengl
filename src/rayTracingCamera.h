@@ -1,13 +1,8 @@
+#pragma once
 #include <cmath>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <iostream>
-#include <system_error>
-#include "glm/common.hpp"
-#include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
-#include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
 #include "glm/trigonometric.hpp"
 #include "shader.h"
@@ -24,9 +19,9 @@ public:
   glm::vec3 w = glm::vec3(0.0f, 0.0f, -1.0f);
   glm::vec3 u = glm::vec3(1.0f, 0.0f, 0.0f);
   glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f);
-  float camSensitivity = 0.1;
-  float slowSpeed = 0.5f;
-  float fastSpeed = 10.0f;
+  float camSensitivity = 0.3;
+  float slowSpeed = 50.0f;
+  float fastSpeed = 100.0f;
   bool moveFast = false;
   float focal_length = 1.0;
   Shader shader;
@@ -35,7 +30,7 @@ public:
       : shader(shader), width(windowWidth), height(windowHeight) {}
 
   void initCamera() {
-    frame = 1;
+    frame = 0;
     aspectRatio = float(width) / float(height);
     w = glm::vec3(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
                   sin(glm::radians(pitch)),
@@ -58,8 +53,8 @@ public:
 
     shader.use();
     shader.setVec3("camera_position", position);
-    shader.setInt("width", width);
-    shader.setInt("height", height);
+    shader.setInt("width", width / 2);
+    shader.setInt("height", height / 2);
     shader.setVec3("delta_u", delta_u);
     shader.setVec3("delta_v", delta_v);
     shader.setVec3("firstPixelLocation", firstPixelLocation);
@@ -95,8 +90,8 @@ public:
   }
 
   void rotate(double prevx, double prevy, float x, float y) {
-    shader.setUInt("frame", frame);
     frame++;
+    shader.setUInt("frame", frame);
     if (x == prevx && y == prevy) {
       return;
     }
@@ -115,5 +110,5 @@ public:
   }
 
 private:
-  uint frame = 1;
+  uint frame = 0;
 };

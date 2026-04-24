@@ -1,4 +1,6 @@
 #pragma once
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/matrix.hpp"
 #include "shader.h"
 #include "mesh.h"
 #include <assimp/BaseImporter.h>
@@ -10,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include "stb_image.h"
+#include "boundingbox.h"
 
 unsigned int TextureFromFile(const char *path, const std::string &directory) {
   std::string filename = std::string(path);
@@ -52,6 +55,8 @@ unsigned int TextureFromFile(const char *path, const std::string &directory) {
 
 class Model {
 public:
+  boundingBox bbox = boundingBox();
+
   Model(std::string path) { LoadModel(path); }
 
   void Draw(Shader &shader) {
@@ -60,10 +65,29 @@ public:
     }
   }
 
+  glm::mat4 applyTransformation(const glm::mat4 &t) {
+    return transformation * t;
+  }
+
+  const glm::mat4 &modelMatrix() const { return transformation; }
+  // pass in world space ray
+  bool hitBbox(Ray r, float closest) {
+    Ray modelSpaceRay = Ray::transform(r, invTransformation);
+    return bbox.hit(r, closest);
+  }
+
 private:
   std::vector<Mesh> meshes;
   std::string directory;
   std::vector<Texture> textures_loaded;
+  float minx = +infinity;
+  float maxx = -infinity;
+  float miny = +infinity;
+  float maxy = -infinity;
+  float minz = +infinity;
+  float maxz = -infinity;
+  glm::mat4 transformation = glm::mat4(1.0);
+  glm::mat4 invTransformation = glm::inverse(transformation);
   void LoadModel(std::string path) {
     Assimp::Importer importer;
     const aiScene *scene =
@@ -76,6 +100,7 @@ private:
     }
     directory = path.substr(0, path.find_last_of('/'));
     processNode(scene->mRootNode, scene);
+    bbox = boundingBox(maxx, maxy, maxz, minx, miny, minz);
   }
   void processNode(aiNode *node, const aiScene *scene) {
     for (unsigned int i = 0; i < node->mNumMeshes; i++) {
@@ -97,6 +122,12 @@ private:
       vector.y = mesh->mVertices[i].y;
       vector.z = mesh->mVertices[i].z;
       vertex.Position = vector;
+      minx = std::min(minx, vector.x);
+      maxx = std::max(maxx, vector.x);
+      miny = std::min(miny, vector.y);
+      maxy = std::max(maxy, vector.y);
+      minz = std::min(minz, vector.z);
+      maxz = std::max(maxz, vector.z);
       vector.x = mesh->mNormals[i].x;
       vector.y = mesh->mNormals[i].y;
       vector.z = mesh->mNormals[i].z;

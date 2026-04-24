@@ -38,6 +38,7 @@ struct Quad {
   vec3 u;
   vec3 v;
   vec3 n;
+  bool oneSided;
   // the D of Ax+By+Cz=D where (A,B,C) is normal and (x,y,z) is the point so it is dot(n,bottomLeft)
   float D;
   Material mat;
@@ -202,15 +203,33 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
 
 bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
   float denom = dot(q.n,r.direction);
-  if (denom <= 1e-8){
+  if (abs( denom ) <= 1e-8){
 		return false;
   }
   float np = dot(q.n,r.origin);
   float t = (q.D-np)/denom;
-  if (t>=closestHit){
+  if (t<0.001 || t>=closestHit){
 	 return false;
   }
   vec3 p = rayAt(r,t);
+  vec3 relativeP = p-q.bottomLeft;
+  // checking if the hitpoint lies in the quad
+  float a = dot(q.u,q.u);
+  float b = dot(q.u,q.v);
+  float c = dot(relativeP,q.u);
+  float d = dot(q.v,q.v);
+  float e = dot(relativeP,q.v);
+  float beta = (( a*e )-(b*c))/((a*d)-(b*b));
+  float alpha = (c-(b*beta))/a;
+  if (beta >1 || beta <0 || alpha < 0 || alpha >1){
+	 return false;
+  }
+  bool frontFace=isFrontFace(r.direction,q.n);
+  if (q.oneSided){
+	 if (!frontFace){
+		return false;
+	 }
+  }
   vec3 n = isFrontFace(r.direction,q.n)?q.n:-q.n;
   ht = newHitInfo(p, n, t, q.mat);
   return true;
@@ -232,11 +251,11 @@ bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h, float closest){
   return hitAnything;
 }
 
-bool hitQuads(Quad[6] world,Ray r,inout HitInfo h, float closest){
+bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
   float closestSoFar=closest;
   bool hitAnything=false;
-  for (int i=0;i<3;i++){
+  for (int i=0;i<7;i++){
 	 if (hitQuad(world[i],r,tempHit, closestSoFar)){
 		hitAnything=true;
 		if (tempHit.t<closestSoFar){
@@ -290,7 +309,7 @@ vec3 emit(Ray r_in,HitInfo h){
 }
 
 
-vec3 rayColor(Ray r, Sphere[3]world,Quad[6] quads, int maxDepth){
+vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
   vec3 color = vec3(0.0,0.0,0.0);
   vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
@@ -302,18 +321,21 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[6] quads, int maxDepth){
 	 bool hitAnything=false;
 	 HitInfo h;
 	 if (hitSpheres(world,r,h,1.0/0.0)){
-		 hitAnything=true; 
-		// return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
+	  hitAnything=true; 
+	 // return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
 	 }
 	 float closest = 1.0/0.0;
 	 if(hitAnything){
 		closest = h.t;
 	 }
-	 if(hitQuads(quads,r,h,closest)){
-		hitAnything=true;
+    if(hitQuads(quads,r,h,closest)){
+	 hitAnything=true;
 	 }
+	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
-		return vec3(0.0);
+		// return vec3(0.0,0.0,0.0);
+		return vec3(0.6,0.3,0.2);
+
 	 }
 	 // return ( h.normal+1 )*0.5;
 	 // return vec3(1.0,0.3,0.3);
@@ -334,14 +356,15 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[6] quads, int maxDepth){
   return color;
 }
 
-vec3 multiSampleLoop(Sphere[3] world,Quad[6] q,int samplesPerPixel,vec3 origin, vec3 fragCoord){
+vec3 multiSampleLoop(Sphere[3] world,Quad[7] q,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
 	 gSeed = fragCoord.xy +rand(vec2(fragCoord.x+ i*37,fragCoord.y+i*67));
-	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5)*0.008,0.0);
-	 vec3 rayDir = normalize(( fragCoord-origin )+randomSample);
+	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5),0.0);
+	 vec3 offset = randomSample.x*delta_u + randomSample.y*delta_v;
+	 vec3 rayDir = normalize(( fragCoord-origin )+offset);
 	 Ray r = createRay(origin,rayDir);
-	 color+= rayColor(r,world,q,3);
+	 color+= rayColor(r,world,q,10);
   }
   if (color.x>=1.0/0.0||color.y>=1.0/0.0||color.z>=1.0/0.0){
 	 color = vec3(0.0, 1, 0.0);
@@ -350,7 +373,74 @@ vec3 multiSampleLoop(Sphere[3] world,Quad[6] q,int samplesPerPixel,vec3 origin, 
 }
 
 void main() {
+  Material white_diffuse;
+  white_diffuse.type = LAMBERTIAN;
+  white_diffuse.albedo = vec3(0.73, 0.73, 0.73);
+
+  Material red_diffuse;
+  red_diffuse.type = LAMBERTIAN;
+  red_diffuse.albedo = vec3(0.85, 0.35, 0.35);
+
+  Material green_diffuse;
+  green_diffuse.type = LAMBERTIAN;
+  green_diffuse.albedo = vec3(0.12, 0.45, 0.15);
+
+  Material blue_diffuse;
+  blue_diffuse.type = LAMBERTIAN;
+  blue_diffuse.albedo = vec3(0.35, 0.45, 0.85);
+
+  Material yellow_diffuse;
+  yellow_diffuse.type = LAMBERTIAN;
+  yellow_diffuse.albedo = vec3(0.9, 0.8, 0.4);
+
+  Material silver_metal;
+  silver_metal.type = METAL;
+  silver_metal.albedo = vec3(0.9, 0.9, 0.9);
+  silver_metal.fuzz = 0.0;
+
+  Material gold_metal;
+  gold_metal.type = METAL;
+  gold_metal.albedo = vec3(0.8, 0.6, 0.2);
+  gold_metal.fuzz = 0.05;
+
+  Material copper_metal;
+  copper_metal.type = METAL;
+  copper_metal.albedo = vec3(0.9, 0.5, 0.3);
+  copper_metal.fuzz = 0.1;
+
+  Material rough_metal;
+  rough_metal.type = METAL;
+  rough_metal.albedo = vec3(0.6, 0.6, 0.6);
+  rough_metal.fuzz = 0.25;
+
+  Material blue_metal;
+  blue_metal.type = METAL;
+  blue_metal.albedo = vec3(0.4, 0.5, 0.9);
+  blue_metal.fuzz = 0.08;
+
+  Material white_light;
+  white_light.type = LIGHT;
+  white_light.emission = vec3(150.0, 150.0, 150.0);
+
+  Material warm_light;
+  warm_light.type = LIGHT;
+  warm_light.emission = vec3(255.0, 220.0, 120.0);
+
+  Material cool_light;
+  cool_light.type = LIGHT;
+  cool_light.emission = vec3(120.0, 180.0, 255.0);
+
+  Material red_light;
+  red_light.type = LIGHT;
+  red_light.emission = vec3(200.0, 80.0, 80.0);
+
+  Material blue_light;
+  blue_light.type = LIGHT;
+  blue_light.emission = vec3(80.0, 80.0, 200.0);
+
   Sphere s[3];
+  Material normal;
+  normal.type=NORMAL;
   Material white;
   white.type=LAMBERTIAN;
   white.albedo=vec3(0.73,0.73,0.73);
@@ -358,74 +448,93 @@ void main() {
   red.type=METAL;
   red.fuzz=0.2;
   Material green;
-  green.type=METAL;
+  green.type=LAMBERTIAN;
   green.fuzz=0.1;
   Material light;
   light.type=LIGHT;
   light.albedo=vec3(0.58, 0.173, 0.259);
-  red.albedo=vec3(0.65,0.5,0.5);
+  red.albedo=vec3(0.85,0.4,0.4);
   green.albedo = vec3( 0.12,0.45,0.15 );
-  light.emission = vec3(15.0,15.0,15.0);
-  s[0].origin = vec3(0.0, 0.0, -1.0);
-  s[0].radius = 0.5;
+  light.emission = vec3(150.0,150.0,150.0);
+  s[0].origin = vec3(80.0, 40.0, 60.0);
+  s[0].radius = 40;
   s[0].mat = red;
-  s[1].origin = vec3(0.0, -100.5, -1.1);
+  s[1].origin = vec3(200.0, 120.0, 400.0);
   s[1].radius = 100.0;
   s[1].mat = green;
   s[2].origin = vec3(0, 7.0, 0.0);
-  s[2].radius = 2;
+  s[2].radius = 0.1;
   s[2].mat = light;
 
-  Quad q[6];
+  Quad q[7];
 
-  // Left wall (green)
+
+  // Left wall (green) — x = 555, normal = -X
   q[0] = CreateQuad(
 	 vec3(555, 0, 0),
-	 vec3(0, 555, 0),
-	 vec3(0, 0, 555)
+	 vec3(0, 0, 555),
+	 vec3(0, 555, 0)
   );
-  q[0].mat = green;
+  q[0].mat = blue_diffuse;
+  q[0].oneSided = true;
 
-  // Right wall (red)
+
+  // Right wall (red) — x = 0, normal = +X
   q[1] = CreateQuad(
 	 vec3(0, 0, 0),
 	 vec3(0, 555, 0),
 	 vec3(0, 0, 555)
   );
-  q[1].mat = red;
-
-  // Light (ceiling rectangle)
+  q[1].mat = rough_metal;
+  q[1].oneSided = true;
+  // Light (ceiling rectangle) — keep double-sided
   q[2] = CreateQuad(
 	 vec3(343, 554, 332),
 	 vec3(-130, 0, 0),
 	 vec3(0, 0, -105)
   );
   q[2].mat = light;
+  // q[2].oneSided = false; // IMPORTANT: leave it off
 
-  // Floor
+
+  // Floor — y = 0, normal = +Y
   q[3] = CreateQuad(
 	 vec3(0, 0, 0),
-	 vec3(555, 0, 0),
-	 vec3(0, 0, 555)
+	 vec3(0, 0, 555),
+	 vec3(555, 0, 0)
   );
-  q[3].mat = white;
+  q[3].mat = blue_diffuse;
+  q[3].oneSided = true;
 
-  // Ceiling
+
+  // Ceiling — y = 555, normal = -Y
   q[4] = CreateQuad(
 	 vec3(555, 555, 555),
 	 vec3(-555, 0, 0),
 	 vec3(0, 0, -555)
   );
-  q[4].mat = white;
+  q[4].mat = blue_diffuse;
+  q[4].oneSided = true;
 
-  // Back wall
+
+  // Back wall — z = 555, normal = -Z
   q[5] = CreateQuad(
 	 vec3(0, 0, 555),
+	 vec3(0, 555, 0),
+	 vec3(555, 0, 0)
+  );
+  q[5].mat = blue_diffuse;
+  q[5].oneSided = true;
+
+
+  // Front wall — z = 0, normal = +Z
+  q[6] = CreateQuad(
+	 vec3(0, 0, 0),
 	 vec3(555, 0, 0),
 	 vec3(0, 555, 0)
   );
-  q[5].mat = white;
-
+  q[6].mat = yellow_diffuse;
+  q[6].oneSided = true;
 
   vec3 coord = (FragPosition+1)*0.5;
   coord.x *= width; 
@@ -434,7 +543,12 @@ void main() {
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
   // vec3 rayDirection = normalize(coord - cameraPosition);
   // Ray r = createRay(cameraPosition, rayDirection);
-  vec3 color = multiSampleLoop(s,q, uSamplesPerPixel,camera_position,viewPortPixelCoord);
+  vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
+	 // gSeed = coord.xy +rand(vec2(viewPortPixelCoord.x+ time*37,viewPortPixelCoord.y+time*67));
+	 // vec3 randomSample = vec3((randVec2(viewPortPixelCoord.xy+time)-0.5)*0.01,0.0);
+	 // vec3 rayDir = normalize(( ( viewPortPixelCoord + randomSample )-camera_position ));
+	 // Ray r = createRay(camera_position ,rayDir);
+	 // vec3 color = rayColor(r,s,q,10);
   // vec3 color = rayColor(r,s,2);
   // if (hitSphere(s, r,h)) {
   // FragColor = vec4(h.normal, 1.0f);

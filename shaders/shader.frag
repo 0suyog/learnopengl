@@ -16,6 +16,7 @@ float LinearizeDepth(float depth){
   return (2.0 * near * far) / (far + near - ndc * (far - near));
 }
 void main(){
+  // FragColor = vec4(1.0);
   FragColor = texture(material.texture_diffuse[0], TexCoord);
 //   float depthValue = gl_FragCoord.z;
 // float linearDepth = LinearizeDepth(depthValue)/far;

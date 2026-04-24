@@ -1,9 +1,11 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_projection.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/trigonometric.hpp"
 #include "model.h"
+#include "scene.h"
 #include <complex>
 #include <cstdlib>
 #define STB_IMAGE_IMPLEMENTATION
@@ -14,16 +16,19 @@
 #include <iostream>
 #include <ostream>
 #include "rayTracingCamera.h"
+#include "camera.h"
+#include "MoveObjectsWithMouseScene.h"
+#include "InputState.h"
 
 glm::vec3 movementVector;
 
-int window_width = 800;
-int window_height = 600;
+Scene *Scene::current = nullptr;
+WindowState globalWindowState{nullptr, 800, 600};
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
-  window_width = width;
-  window_height = height;
+  globalWindowState.width = width;
+  globalWindowState.height = height;
 }
 
 void process_input(GLFWwindow *window) {
@@ -39,9 +44,23 @@ double mousey;
 double prevMouseX;
 double prevMouseY;
 
+bool mouseDown = false;
+
 bool firstMouseMovement = true;
 
 void mouseCallback(GLFWwindow *window, double _mouseX, double _mouseY) {
+  globalInputState.prevMousex = globalInputState.mousex;
+  globalInputState.prevMousey = globalInputState.mousey;
+  globalInputState.mousex = _mouseX;
+  globalInputState.mousey = _mouseY;
+  globalInputState.deltaX = _mouseX - globalInputState.prevMousex;
+  globalInputState.deltaY = _mouseY - globalInputState.prevMousey;
+  if (mouseDown) {
+    if (Scene::current) {
+      Scene::current->onMouseDrag(_mouseX, _mouseY, mousex - _mouseX,
+                                  mousey - _mouseY);
+    }
+  }
   if (firstMouseMovement) {
     firstMouseMovement = false;
     mousex = _mouseX;
@@ -53,21 +72,32 @@ void mouseCallback(GLFWwindow *window, double _mouseX, double _mouseY) {
   mousey = _mouseY;
 }
 
+void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+    mouseDown = action == GLFW_PRESS;
+  }
+  if (Scene::current) {
+    Scene::current->onMouseClick(button, action, mods);
+  }
+}
+
 int main() {
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window = glfwCreateWindow(window_width, window_height,
-                                        "LearnOpenglBySuyog", NULL, NULL);
+  GLFWwindow *window =
+      glfwCreateWindow(globalWindowState.width, globalWindowState.height,
+                       "LearnOpenglBySuyog", NULL, NULL);
+  globalWindowState.window = window;
   if (window == NULL) {
     std::cerr << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
     return -1;
   }
 
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_CAPTURED);
 
   glfwMakeContextCurrent(window);
 
@@ -79,10 +109,10 @@ int main() {
 
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetCursorPosCallback(window, mouseCallback);
+  glfwSetMouseButtonCallback(window, mouseButtonCallback);
 
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
-
   stbi_set_flip_vertically_on_load_thread(true);
   // Model floor("../models/floor/floor.obj");
   // Model noiseCube("../models/noiseCube/Untitled.obj");
@@ -132,8 +162,8 @@ int main() {
   unsigned int rayTracerTexture;
   glGenTextures(1, &rayTracerTexture);
   glBindTexture(GL_TEXTURE_2D, rayTracerTexture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, window_width, window_height, 0, GL_RGB,
-               GL_UNSIGNED_BYTE, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, globalWindowState.width,
+               globalWindowState.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -143,8 +173,8 @@ int main() {
   unsigned int raytracerRBO;
   glGenRenderbuffers(1, &raytracerRBO);
   glBindRenderbuffer(GL_RENDERBUFFER, raytracerRBO);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, window_width,
-                        window_height);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8,
+                        globalWindowState.width, globalWindowState.height);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
@@ -172,80 +202,94 @@ int main() {
   float vfov = glm::radians(90.0);
   glm::vec3 camera_position = glm::vec3(0.0, 0.0, 0.0);
 
-  RayTracingCamera cam(raytracerShader, window_width, window_width);
+  RayTracingCamera cam(raytracerShader, globalWindowState.width,
+                       globalWindowState.height);
   cam.initCamera();
-  cam.handleWindowSizeChange(window_width, window_height);
-  cam.position = glm::vec3(278, 278, -800.0);
+  cam.handleWindowSizeChange(globalWindowState.width, globalWindowState.height);
+  cam.position = glm::vec3(0.0f, 0.0f, 0.0f);
   cam.yaw = 90.0f;
   cam.pitch = 90.0f;
-  glm::mat4 projection =
-      glm::perspective(glm::radians(cam.fov),
-                       float(window_width) / float(window_width), 0.1f, 100.0f);
+  glm::mat4 projection = glm::perspective(glm::radians(cam.fov),
+                                          float(globalWindowState.width) /
+                                              float(globalWindowState.height),
+                                          0.1f, 100.0f);
   float deltaTime = 0;
   float prevFrame = glfwGetTime();
   int samplesPerPixel = 10;
+  int frame = 0;
+
+  MoveObjectsWithMouse moveObject;
+  moveObject.init();
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   while (!glfwWindowShouldClose(window)) {
-    glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);
+    frame++;
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - prevFrame;
+    globalInputState.deltaTime = deltaTime;
     prevFrame = currentFrame;
+    Scene::current = &moveObject;
+    moveObject.update(deltaTime);
+    moveObject.draw();
+    // moveObject.c.move(window, deltaTime);
+    // moveObject.c.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
+    // glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);
     process_input(window);
-    // cam.moveFast = false;
-    // cam.move(window, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-      cam.moveFast = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-      samplesPerPixel += 1;
-      std::cerr << samplesPerPixel << std::endl;
-    }
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-      samplesPerPixel -= 1;
-      std::cerr << samplesPerPixel << std::endl;
-    }
-    // if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
-    //   std::cerr << "camera Pos: " << cam.position.x << " " << cam.position.y
-    //             << " " << cam.position.z << std::endl;
-    //   std::cerr << "Yaw: " << cam.yaw << std::endl;
-    //   std::cerr << "Pitch: " << cam.pitch << std::endl;
+    // // cam.moveFast = false;
+    // // cam.move(window, deltaTime);
+    // if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+    //   cam.moveFast = true;
     // }
-    // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_DEPTH_BUFFER_BIT);
+    // if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+    //   samplesPerPixel += 1;
+    //   std::cerr << samplesPerPixel << std::endl;
+    // }
+    // if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+    //   samplesPerPixel -= 1;
+    //   std::cerr << samplesPerPixel << std::endl;
+    // }
+    // // if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
+    // //   std::cerr << "camera Pos: " << cam.position.x << " " <<
+    // cam.position.y
+    // //             << " " << cam.position.z << std::endl;
+    // //   std::cerr << "Yaw: " << cam.yaw << std::endl;
+    // //   std::cerr << "Pitch: " << cam.pitch << std::endl;
+    // // }
+    // // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    // glClear(GL_DEPTH_BUFFER_BIT);
+    // // cam.move(window, deltaTime);
+    // // cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
+    // // auto view = cam.lookAtMatrix();
+    // raytracerShader.use();
+    // cam.rotate(prevMouseX, prevMouseY, mousex, mousey);
     // cam.move(window, deltaTime);
-    // cam.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
-    // auto view = cam.lookAtMatrix();
-    raytracerShader.use();
-    cam.rotate(prevMouseX, prevMouseY, mousex, mousey);
-    cam.move(window, deltaTime);
-    float time = glfwGetTime();
-    raytracerShader.setFloat("time", time);
-    raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
-    // raytracerShader.setInt("focal_length", focal_length);
-    // raytracerShader.setInt("width", window_width);
-    // raytracerShader.setInt("height", widnow_height);
-    raytracerShader.setFloat("vfov", vfov);
-    glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    displayShader.use();
+    // float time = glfwGetTime();
+    // raytracerShader.setFloat("time", time);
+    // raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
+    // // raytracerShader.setInt("focal_length", focal_length);
+    // // raytracerShader.setInt("width", window_width);
+    // // raytracerShader.setInt("height", widnow_height);
+    // raytracerShader.setFloat("vfov", vfov);
+    // glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-    // commented out to amke a ray tracer shader
-    // basicShader.use();
-    // basicShader.setMat4f("view", view);
-    // basicShader.setMat4f("projection", projection);
-    // basicShader.setMat4f("model", backpackModel);
-    // backpack.Draw(basicShader);
-    // basicShader.setMat4f("model", floorModel);
-    // floor.Draw(basicShader);
-    // basicShader.setMat4f("model", noiseCubeModel);
-    // noiseCube.Draw(basicShader);
-    // basicShader.setMat4f("model", woodCubeModel);
-    // woodCube.Draw(basicShader);
+    // displayShader.use();
+    // // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    //
+    // // commented out to amke a ray tracer shader
+    // // basicShader.use();
+    // // basicShader.setMat4f("view", view);
+    // // basicShader.setMat4f("projection", projection);
+    // // basicShader.setMat4f("model", backpackModel);
+    // // backpack.Draw(basicShader);
+    // // basicShader.setMat4f("model", floorModel);
+    // // floor.Draw(basicShader);
+    // // basicShader.setMat4f("model", noiseCubeModel);
+    // // noiseCube.Draw(basicShader);
+    // // basicShader.setMat4f("model", woodCubeModel);
+    // // woodCube.Draw(basicShader);
     prevMouseX = mousex;
     prevMouseY = mousey;
     glfwSwapBuffers(window);

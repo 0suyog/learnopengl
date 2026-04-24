@@ -1,3 +1,4 @@
+#pragma once
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -23,7 +24,18 @@ public:
     direction = glm::vec3(cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
                           sin(glm::radians(pitch)),
                           sin(glm::radians(yaw)) * cos(glm::radians(pitch)));
-    return glm::lookAt(position, position + direction, up);
+    // glm::vec3 direction;
+    // direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    // direction.y = sin(glm::radians(pitch));
+    // direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    // direction = glm::normalize(-direction);
+    glm::vec3 vx = glm::cross(up, direction);
+    vx = glm::normalize(vx);
+    up = glm::cross(direction, vx);
+    return glm::mat4(vx.x, vx.y, vx.z, 1, up.x, up.y, up.z, 1, direction.x,
+                     direction.y, direction.z, 1, -glm::dot(vx, position),
+                     -glm::dot(up, position), -glm::dot(direction, position),
+                     1);
   }
 
   void move(GLFWwindow *window, float deltaTime) {
@@ -52,10 +64,8 @@ public:
     position += deltaTime * speed * movementVector;
   }
 
-  void rotate(double *prevx, double *prevy, float x, float y) {
-    yaw += (x - *prevx) * camSensitivity;
-    pitch -= (y - *prevy) * camSensitivity;
-    *prevx = x;
-    *prevy = y;
+  void rotate(float dx, float dy) {
+    yaw += dx * camSensitivity;
+    pitch -= dy * camSensitivity;
   }
 };

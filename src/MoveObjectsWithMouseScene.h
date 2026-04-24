@@ -1,4 +1,7 @@
 #pragma once
+#include "model.h"
+#include "scene.h"
+#include "shader.h"
 #include "InputState.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -7,9 +10,6 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include <glm/gtx/string_cast.hpp>
 #include "glm/trigonometric.hpp"
-#include "model.h"
-#include "scene.h"
-#include "shader.h"
 #include <iostream>
 #include <memory>
 #include <vector>

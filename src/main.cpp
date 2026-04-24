@@ -6,6 +6,7 @@
 #include "glm/trigonometric.hpp"
 #include "model.h"
 #include "scene.h"
+#include "screenToWorldSpace.h"
 #include <complex>
 #include <cstdlib>
 #define STB_IMAGE_IMPLEMENTATION
@@ -220,6 +221,8 @@ int main() {
 
   MoveObjectsWithMouse moveObject;
   moveObject.init();
+  ScreenSpaceToWorldSpace screenToWorldSpace;
+  screenToWorldSpace.init();
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   while (!glfwWindowShouldClose(window)) {
@@ -228,9 +231,11 @@ int main() {
     deltaTime = currentFrame - prevFrame;
     globalInputState.deltaTime = deltaTime;
     prevFrame = currentFrame;
-    Scene::current = &moveObject;
-    moveObject.update(deltaTime);
-    moveObject.draw();
+    Scene::current = &screenToWorldSpace;
+    screenToWorldSpace.update(deltaTime);
+    screenToWorldSpace.draw();
+    // moveObject.update(deltaTime);
+    // moveObject.draw();
     // moveObject.c.move(window, deltaTime);
     // moveObject.c.rotate(&prevMouseX, &prevMouseY, mousex, mousey);
     // glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);

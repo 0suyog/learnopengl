@@ -2,13 +2,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include "InputState.h"
+#include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/geometric.hpp"
+#include "glm/matrix.hpp"
 #include "glm/trigonometric.hpp"
 class Camera {
 public:
+  float width = globalWindowState.width;
+  float height = globalWindowState.height;
   float pitch = 45.0f;
   float yaw = -90.0f;
   glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -19,6 +23,8 @@ public:
   float slowSpeed = 1.5f;
   float fastSpeed = 10.0f;
   bool moveFast = false;
+  float nearPlane = 0.01f;
+  float farPlane = 1000.0f;
 
   const glm::mat4 lookAtMatrix() {
     direction = -glm::normalize(
@@ -45,19 +51,37 @@ public:
     // return glm::lookAt(position, position + direction, vy);
   }
 
+  glm::mat4 perspective_projection() {
+    return glm::perspective(glm::radians(fov), width / height, nearPlane,
+                            farPlane);
+  }
+
+  glm::vec3 mouseCoordToWorldSpaceAtNearPlane(int mousex, int mousey) {
+    auto ndcCoord = glm::vec3(2 * ((float(mousex) / width) - 0.5),
+                              2 * ((float(mousey) / height) - 0.5), 1);
+    std::cerr << ndcCoord.x << " " << ndcCoord.y << "\n";
+    std::cerr << "ndcCoord\n";
+    auto clipCoord = glm::vec4(ndcCoord.x, ndcCoord.y, -1.0f, 1.0f);
+    auto viewCoord = glm::inverse(perspective_projection()) * clipCoord;
+    viewCoord.z = -1;
+    viewCoord.w = 1;
+    auto worldCoord = glm::inverse(lookAtMatrix()) * viewCoord;
+    return glm::normalize(worldCoord);
+  }
+
   void move(GLFWwindow *window, float deltaTime) {
     auto movementVector = glm::vec3(0.0f, 0.0f, 0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-      movementVector += direction;
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
       movementVector -= direction;
     }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+      movementVector += direction;
+    }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-      movementVector += glm::cross(up, direction);
+      movementVector -= glm::cross(up, direction);
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-      movementVector -= glm::cross(up, direction);
+      movementVector += glm::cross(up, direction);
     }
     if (movementVector.x == 0.0 && movementVector.y == 0.0 &&
         movementVector.z == 0) {

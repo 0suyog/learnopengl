@@ -18,6 +18,7 @@ const uint LAMBERTIAN = 1u;
 const uint METAL = 2u;
 const uint NORMAL = 3u;
 const uint LIGHT = 4u;
+const uint DIELECTRIC = 5u;
 
 
 struct Material{
@@ -135,22 +136,28 @@ bool isFrontFace(vec3 incomingDir,vec3 normal){
 //     p += dot(p, p + 78.233);
 //     return fract(p.x * p.y);
 // }
-float rand(vec2 p) {
-    return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
+
+vec2 gSeed = vec2(
+  float(frame) + FragPosition.x,
+  float(frame) + FragPosition.y
+);
+
+float rand() {
+    gSeed =  vec2(fract(sin(dot(gSeed, vec2(12.9898,78.233))) * 43758.5453),fract(sin(dot(gSeed.yx, vec2(12.9898,78.233))) * 43758.5453));
 }
 
-vec3 randVec3(vec2 seed){
-  return vec3(rand(seed.xy),rand(seed.yx),rand(seed.yx+seed.xy));
+vec3 randVec3(){
+  return vec3(rand(gSeed.xy),rand(gSeed.yx),rand(gSeed.yx+gSeed.xy));
 }
 
-vec2 randVec2(vec2 seed){
-  return vec2(rand(seed.xy),rand(seed.yx));
+vec2 randVec2(){
+  return vec2(rand(gSeed.xy),rand(gSeed.yx));
 }
 
-vec3 randVec3InSphere(vec2 seed){
+vec3 randVec3InSphere(){
   int count = 0;
   while(true){
-	 vec3 randomVec = (randVec3(seed)-0.5)*2;
+	 vec3 randomVec = (randVec3()-0.5)*2;
 	 float len = length(randomVec);
 	 if (len<=1){
 		if (len < 1e-6) return vec3(1.0, 0.0, 0.0); 
@@ -170,7 +177,6 @@ vec3 randVec3InHemisphere(vec2 seed, vec3 normal){
   return randomVec;
 }
 
-vec2 gSeed;
 
 
 bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
@@ -366,10 +372,8 @@ vec3 multiSampleLoop(Sphere[3] world,Quad[7] q,int samplesPerPixel,vec3 origin, 
 	 Ray r = createRay(origin,rayDir);
 	 color+= rayColor(r,world,q,10);
   }
-  if (color.x>=1.0/0.0||color.y>=1.0/0.0||color.z>=1.0/0.0){
-	 color = vec3(0.0, 1, 0.0);
-  }
-  return color/samplesPerPixel;
+  color= color/samplesPerPixel;
+  return color;
 }
 
 void main() {
@@ -541,21 +545,12 @@ void main() {
   coord.y*=height;
   coord.z = -focal_length;
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
-  // vec3 rayDirection = normalize(coord - cameraPosition);
-  // Ray r = createRay(cameraPosition, rayDirection);
   vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
-	 // gSeed = coord.xy +rand(vec2(viewPortPixelCoord.x+ time*37,viewPortPixelCoord.y+time*67));
-	 // vec3 randomSample = vec3((randVec2(viewPortPixelCoord.xy+time)-0.5)*0.01,0.0);
-	 // vec3 rayDir = normalize(( ( viewPortPixelCoord + randomSample )-camera_position ));
-	 // Ray r = createRay(camera_position ,rayDir);
-	 // vec3 color = rayColor(r,s,q,10);
-  // vec3 color = rayColor(r,s,2);
-  // if (hitSphere(s, r,h)) {
-  // FragColor = vec4(h.normal, 1.0f);
-  // return;
-  // }
-  // FragColor = vec4(0.0,0.0,( r.direction.y+1 )*0.5,1.0);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
+
+  if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
+	 FragColor = vec4(0.0, 1, 0.0,1.0);
+  }
   // FragColor = vec4(vec3(frame),1.0);
 }

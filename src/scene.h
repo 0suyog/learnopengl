@@ -1,6 +1,6 @@
 #pragma once
-#include "camera.h"
-#include "GLFW/glfw3.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 class Scene {
 public:
   Scene() {};
@@ -14,6 +14,7 @@ public:
   virtual void onMouseDrag(float xPos, float yPos, float dx, float dy) {};
   virtual void onKeyPress(int buttons, int action, int mods) {};
   virtual void onWindowResize(GLFWwindow *window, int width, int height) {};
+  virtual void onMouseMove(float xPos, float yPos, float dx, float dy) {};
 
   virtual void draw() = 0;
 

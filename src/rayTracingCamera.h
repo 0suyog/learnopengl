@@ -19,7 +19,7 @@ public:
   glm::vec3 w = glm::vec3(0.0f, 0.0f, -1.0f);
   glm::vec3 u = glm::vec3(1.0f, 0.0f, 0.0f);
   glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f);
-  float camSensitivity = 0.3;
+  float camSensitivity = 0.3f;
   float slowSpeed = 50.0f;
   float fastSpeed = 100.0f;
   bool moveFast = false;
@@ -89,14 +89,17 @@ public:
     initCamera();
   }
 
-  void rotate(double prevx, double prevy, float x, float y) {
+  void update() {
     frame++;
     shader.setUInt("frame", frame);
-    if (x == prevx && y == prevy) {
+  }
+
+  void rotate(float dx, float dy) {
+    if (!dx && !dy) {
       return;
     }
-    yaw += (x - prevx) * camSensitivity;
-    pitch -= ((y - prevy) * camSensitivity);
+    yaw += dx * camSensitivity;
+    pitch -= (dy * camSensitivity);
     initCamera();
   }
 

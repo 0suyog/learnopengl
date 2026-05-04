@@ -73,7 +73,7 @@ public:
   // pass in world space ray
   bool hitBbox(Ray r, float closest) {
     Ray modelSpaceRay = Ray::transform(r, invTransformation);
-    return bbox.hit(r, closest);
+    return bbox.hit(modelSpaceRay, closest);
   }
 
 private:

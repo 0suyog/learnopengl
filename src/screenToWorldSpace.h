@@ -1,4 +1,6 @@
 #pragma once
+#include "camera.h"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "scene.h"
 #include "GLFW/glfw3.h"
 #include "InputState.h"
@@ -12,15 +14,18 @@ class ScreenSpaceToWorldSpace : public Scene {
   unsigned int VBO, VAO;
   float vertices[9] = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
   bool drawtriangle = false;
+  glm::mat4 model = glm::mat4(1.0f);
 
 public:
   ScreenSpaceToWorldSpace() {};
   void init() override {
+    c.width = globalWindowState.width;
+    c.height = globalWindowState.height;
     glGenBuffers(1, &VBO);
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                           (void *)0);
     glEnableVertexAttribArray(0);
@@ -30,6 +35,10 @@ public:
   void onMouseClick(int button, int action, int mods) override {
     if (action == GLFW_PRESS) {
       drawtriangle = true;
+      // auto viewSpace = c.mouseCoordToWorldSpace(globalInputState.mousex,
+      //                                           globalInputState.mousey);
+      // std::cerr << viewSpace.x << " " << viewSpace.y << " " << viewSpace.z
+      //           << "\n";
     }
     if (action == GLFW_RELEASE) {
       drawtriangle = false;
@@ -42,14 +51,42 @@ public:
 
   void update(float deltaTime) override {
     auto view = c.lookAtMatrix();
-    auto projection = glm::perspective(glm::radians(90.0f),
-                                       float(globalWindowState.width) /
-                                           globalWindowState.height,
-                                       0.001f, 1000.0f);
+    auto projection = c.perspective_projection();
+    c.move(globalWindowState.window, deltaTime);
     s.use();
     s.setMat4f("view", view);
     s.setMat4f("projection", projection);
-    s.setMat4f("model", glm::mat4(1.0f));
+    auto worldSpace = c.mouseCoordToWorldSpaceAtNearPlane(
+        globalInputState.mousex, globalInputState.mousey);
+    s.setMat4f("model", glm::mat4(1));
+
+    float vertices[9] = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
+                         0.0f,  0.0f,  0.5f, 0.0f};
+    vertices[0] = -0.5f + worldSpace.x;
+    vertices[1] = -0.5f + worldSpace.y;
+    vertices[3] = 0.5f + worldSpace.x;
+    vertices[4] = -0.5f + worldSpace.y;
+    vertices[6] = worldSpace.x;
+    vertices[7] = worldSpace.y;
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+    // for (int i = 0; i < 9; i++) {
+    //   std::cerr << vertices[i] << "\n";
+    // }
+    // std::cerr << "vertices" << "\n";
+    for (int i = 0; i < 3; i++) {
+      std::cerr << worldSpace[i] << "\n";
+    }
+    std::cerr << "worldSpace" << "\n";
+    for (int i = 0; i < 3; i++) {
+      std::cerr << c.position[i] << "\n";
+    }
+    std::cerr << "cam position" << "\n";
   }
   void draw() override {
     glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -57,7 +94,7 @@ public:
     if (drawtriangle) {
       s.use();
       glBindVertexArray(VAO);
-      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glDrawArrays(GL_LINES, 0, 3);
     }
   }
 };

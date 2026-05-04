@@ -1,4 +1,5 @@
 #pragma once
+#include "camera.h"
 #include "model.h"
 #include "scene.h"
 #include "shader.h"
@@ -31,45 +32,65 @@ public:
     models.push_back(
         std::make_shared<Model>("../models/woodCube/woodCube.obj"));
     c.position = glm::vec3(0, 0, 5);
+    c.yaw = -90;
+    c.pitch = 0;
   }
 
   void update(float deltaTime) override {
     view = c.lookAtMatrix();
-    projection = glm::perspective(glm::radians(90.0f),
-                                  float(globalWindowState.width) /
-                                      globalWindowState.height,
-                                  0.001f, 1000.0f);
+    projection = c.perspective_projection();
     c.move(globalWindowState.window, globalInputState.deltaTime);
   }
 
-  void onMouseDrag(float xPos, float yPos, float dx, float dy) override {
-    if (!drawBorder) {
-      c.rotate(dx, dy);
-    }
-  }
+  // void onMouseDrag(float xPos, float yPos, float dx, float dy) override {
+  //   // if (!drawBorder) {
+  //   //   c.rotate(dx, dy);
+  //   // }
+  //
+  //   auto rayOrigin = c.position;
+  //   auto worldSpace = c.mouseCoordToWorldSpaceAtNearPlane(xPos, yPos);
+  //   auto rayDir =
+  //       glm::normalize(glm::vec3(xPos, yPos, c.farPlane) -
+  //                      glm::vec3(globalWindowState.width,
+  //                                globalWindowState.height, c.nearPlane));
+  //
+  //   for (int i = 0; i < 3; i++) {
+  //     std::cerr << worldSpace[i] << "\n";
+  //   }
+  //   std::cerr << "worldSpace" << "\n";
+  //   for (int i = 0; i < 3; i++) {
+  //     std::cerr << c.position[i] << "\n";
+  //   }
+  //   std::cerr << "cam position" << "\n";
+  //
+  //   Ray r(rayOrigin, rayDir);
+  //   r.Draw(s);
+  //   if (models[0]->hitBbox(r, infinity)) {
+  //     drawBorder = true;
+  //   } else {
+  //     drawBorder = false;
+  //   }
+  //   // drawBorder = true;
+  // }
 
   void onMouseClick(int button, int action, int mods) override {
-    float x = (2.0f * globalInputState.mousex) / globalWindowState.width - 1.0f;
-    float y =
-        1.0f - (2.0f * globalInputState.mousey) / globalWindowState.height;
+    auto xPos = globalInputState.mousex;
+    auto yPos = globalInputState.mousey;
+    auto rayOrigin = c.position;
+    auto worldSpace = c.mouseCoordToWorldSpaceAtNearPlane(xPos, yPos);
+    auto rayDir = glm::normalize(c.direction);
 
-    glm::vec4 clip(x, y, -1.0f, 1.0f);
-
-    glm::vec4 viewSpace = glm::inverse(projection) * clip;
-    viewSpace = glm::vec4(viewSpace.x, viewSpace.y, -1.0f, 0.0f);
-
-    glm::vec3 rayDir =
-        glm::normalize(glm::vec3(glm::inverse(view) * viewSpace));
-
-    glm::vec3 rayOrigin = c.position;
+    for (int i = 0; i < 3; i++) {
+      std::cerr << worldSpace[i] << "\n";
+    }
+    std::cerr << "worldSpace" << "\n";
+    for (int i = 0; i < 3; i++) {
+      std::cerr << c.position[i] << "\n";
+    }
+    std::cerr << "cam position" << "\n";
 
     Ray r(rayOrigin, rayDir);
     r.Draw(s);
-
-    std::cerr << rayOrigin.x << " " << rayOrigin.y << " " << rayOrigin.z
-              << "\n";
-    std::cerr << rayDir.x << " " << rayDir.y << " " << rayDir.z << "\n";
-
     if (models[0]->hitBbox(r, infinity)) {
       drawBorder = true;
     } else {
@@ -88,8 +109,11 @@ public:
     s.use();
     s.setMat4f("view", view);
     s.setMat4f("projection", projection);
+    // s.setMat4f("view", glm::mat4(1));
+    // s.setMat4f("projection", glm::mat4(1));
     for (auto model : models) {
-      s.setMat4f("model", model->modelMatrix());
+      s.setMat4f("model",
+                 glm::translate(model->modelMatrix(), glm::vec3(0, 0, -10)));
       model->Draw(s);
     }
     if (drawBorder) {

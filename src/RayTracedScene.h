@@ -122,6 +122,6 @@ private:
 
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);
-  int samplesPerPixel = 1;
+  int samplesPerPixel = 10;
   float vfov = glm::radians(90.0);
 };

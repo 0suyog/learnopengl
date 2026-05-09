@@ -137,40 +137,62 @@ bool isFrontFace(vec3 incomingDir,vec3 normal){
 //     return fract(p.x * p.y);
 // }
 
+// vec2 gSeed = vec2(
+//   float(frame) + FragPosition.x + camera_position.x,
+//   float(frame) + FragPosition.y + camera_position.y
+// );
+
 vec2 gSeed = vec2(
-  float(frame) + FragPosition.x,
-  float(frame) + FragPosition.y
+  fract( float(frame)/9843.0 ) + FragPosition.x + camera_position.x,
+  fract( float(frame)/12889.0 ) + FragPosition.y + camera_position.y
 );
+
+// float rand()
+// {
+//   float a = 12.9898;
+//   float b = 78.233;
+//   float c = 43758.5453;
+//   float dt= dot(gSeed.xy ,vec2(a,b));
+//   float _dt = dot(gSeed.yx,vec2(a,b));
+//   float sn= mod(dt,3.14);
+//   float _sn = mod(_dt,3.14);
+//   gSeed = vec2(fract(sin(sn)*c),fract(sin(_sn)*c));
+//   return fract(sin(sn) * c);
+// }
 
 float rand() {
     gSeed =  vec2(fract(sin(dot(gSeed, vec2(12.9898,78.233))) * 43758.5453),fract(sin(dot(gSeed.yx, vec2(12.9898,78.233))) * 43758.5453));
+  return gSeed.x;
 }
 
 vec3 randVec3(){
-  return vec3(rand(gSeed.xy),rand(gSeed.yx),rand(gSeed.yx+gSeed.xy));
+  return vec3(rand(),rand(),rand());
 }
 
 vec2 randVec2(){
-  return vec2(rand(gSeed.xy),rand(gSeed.yx));
+  return vec2(rand(),rand());
 }
 
 vec3 randVec3InSphere(){
   int count = 0;
   while(true){
+	 count++;
 	 vec3 randomVec = (randVec3()-0.5)*2;
-	 float len = length(randomVec);
+	 float len = dot(randomVec,randomVec);
 	 if (len<=1){
 		if (len < 1e-6) return vec3(1.0, 0.0, 0.0); 
+		// return vec3(1.0,0.0,0.0);
 		return randomVec;
 	 }
-	 if (count > 10){
-	  return vec3(1.0, 0.0, 0.0); 
+	 if (count > 100){
+		// return vec3(0.0,1.0,0.0);
+		return vec3(1.0, 0.0, 0.0); 
 	 }
   }
 }
 
-vec3 randVec3InHemisphere(vec2 seed, vec3 normal){
-  vec3 randomVec = randVec3InSphere(seed);
+vec3 randVec3InHemisphere( vec3 normal){
+  vec3 randomVec = randVec3InSphere();
   if (dot(normal,randomVec)<0){
 	 return -randomVec;
   }
@@ -210,7 +232,7 @@ bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
 bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
   float denom = dot(q.n,r.direction);
   if (abs( denom ) <= 1e-8){
-		return false;
+	 return false;
   }
   float np = dot(q.n,r.origin);
   float t = (q.D-np)/denom;
@@ -249,7 +271,7 @@ bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h, float closest){
 	 if (hitSphere(world[i],r,tempHit, closestSoFar)){
 		hitAnything=true;
 		if (tempHit.t<closestSoFar){
-			 closestSoFar = tempHit.t;
+		  closestSoFar = tempHit.t;
 		  h=tempHit;
 		}
 	 }
@@ -265,7 +287,7 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
 	 if (hitQuad(world[i],r,tempHit, closestSoFar)){
 		hitAnything=true;
 		if (tempHit.t<closestSoFar){
-			 closestSoFar = tempHit.t;
+		  closestSoFar = tempHit.t;
 		  h=tempHit;
 		}
 	 }
@@ -273,27 +295,27 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
   return hitAnything;
 }
 
-vec3 lambertianReflection(vec3 normal,vec2 seed){
-	 vec3 randVec = randVec3InHemisphere(seed,normal);
+vec3 lambertianReflection(vec3 normal){
+  vec3 randVec = randVec3InHemisphere(normal);
   return normalize(randVec);
 }
 
 
 vec3 reflect(vec3 incidentDir,vec3 normal){
- return incidentDir-2.0*dot(incidentDir,normal)*normal;
+  return incidentDir-2.0*dot(incidentDir,normal)*normal;
 }
 
 bool scatter(Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
   switch(h.mat.type){
 	 case (LAMBERTIAN):{
 		scattered.origin = h.position;
-		scattered.direction = lambertianReflection(h.normal,gSeed+time);
+		scattered.direction = lambertianReflection(h.normal);
 		albedo = h.mat.albedo;
 		return true;
 	 };
 	 case (METAL):{
 		scattered.origin = h.position;
-		scattered.direction = normalize(reflect(r_in.direction, h.normal)+(randVec3InSphere((h.position+h.normal+time).xy)*h.mat.fuzz*0.5));
+		scattered.direction = normalize(reflect(r_in.direction, h.normal)+(randVec3InSphere()*h.mat.fuzz*0.5));
 		albedo = h.mat.albedo;
 		return true;
 	 };
@@ -309,7 +331,7 @@ vec3 emit(Ray r_in,HitInfo h){
 		return h.mat.emission;
 	 }
 	 default:{
-		 return vec3(0.0,0.0,0.0);
+		return vec3(0.0,0.0,0.0);
 	 }
   }
 }
@@ -319,7 +341,6 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
   vec3 color = vec3(0.0,0.0,0.0);
   vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
-	 gSeed+=rand(vec2(i*53,i*37));
 	 if (i==maxDepth){
 		return color;
 		// return vec3(0.0,0.0,0.0);
@@ -327,15 +348,15 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 	 bool hitAnything=false;
 	 HitInfo h;
 	 if (hitSpheres(world,r,h,1.0/0.0)){
-	  hitAnything=true; 
-	 // return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
+		hitAnything=true; 
+		// return vec3( (r.direction.x+1)*0.5,(r.direction.y+1)*0.5,(r.direction.z+1)*0.5 );
 	 }
 	 float closest = 1.0/0.0;
 	 if(hitAnything){
 		closest = h.t;
 	 }
-    if(hitQuads(quads,r,h,closest)){
-	 hitAnything=true;
+	 if(hitQuads(quads,r,h,closest)){
+		hitAnything=true;
 	 }
 	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
@@ -365,8 +386,7 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 vec3 multiSampleLoop(Sphere[3] world,Quad[7] q,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
-	 gSeed = fragCoord.xy +rand(vec2(fragCoord.x+ i*37,fragCoord.y+i*67));
-	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5),0.0);
+	 vec3 randomSample = vec3((randVec2()-0.5),0.0);
 	 vec3 offset = randomSample.x*delta_u + randomSample.y*delta_v;
 	 vec3 rayDir = normalize(( fragCoord-origin )+offset);
 	 Ray r = createRay(origin,rayDir);
@@ -462,7 +482,7 @@ void main() {
   light.emission = vec3(150.0,150.0,150.0);
   s[0].origin = vec3(80.0, 40.0, 60.0);
   s[0].radius = 40;
-  s[0].mat = red;
+  s[0].mat = white;
   s[1].origin = vec3(200.0, 120.0, 400.0);
   s[1].radius = 100.0;
   s[1].mat = green;
@@ -489,7 +509,7 @@ void main() {
 	 vec3(0, 555, 0),
 	 vec3(0, 0, 555)
   );
-  q[1].mat = rough_metal;
+  q[1].mat = red_diffuse;
   q[1].oneSided = true;
   // Light (ceiling rectangle) — keep double-sided
   q[2] = CreateQuad(
@@ -547,10 +567,12 @@ void main() {
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
   vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
-  FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
+  FragColor = mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
 
   if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
-	 FragColor = vec4(0.0, 1, 0.0,1.0);
+  FragColor = vec4(0.0, 1, 0.0,1.0);
   }
-  // FragColor = vec4(vec3(frame),1.0);
+  // vec3 r = randVec3InHemisphere(vec3(0.33,0.33,0.33));
+  // float rr = rand();
+  // FragColor = vec4(r,1.0);
 }

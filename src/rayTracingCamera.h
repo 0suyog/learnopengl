@@ -30,7 +30,7 @@ public:
       : shader(shader), width(windowWidth), height(windowHeight) {}
 
   void initCamera() {
-    frame = 0;
+    frame = 1;
     aspectRatio = float(width) / float(height);
     w = glm::vec3(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
                   sin(glm::radians(pitch)),
@@ -113,5 +113,5 @@ public:
   }
 
 private:
-  uint frame = 0;
+  uint frame = 1;
 };

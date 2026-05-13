@@ -62,13 +62,14 @@ public:
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     cam.initCamera();
-    cam.position = glm::vec3(0.0f, 0.0f, 0.0f);
+    cam.position = glm::vec3(555.0f / 2, 555.0f / 2, 555.0f);
     cam.yaw = 90.0f;
-    cam.pitch = 90.0f;
+    cam.pitch = 0.0f;
+    cam.vfov = 60;
     cam.camSensitivity = 0.1f;
   }
   void update(float deltaTime) override {
-    if (glfwGetKey(globalWindowState.window, GLFW_KEY_LEFT_SHIFT) ==
+    if (glfwGetKey(globalWindowState.window, GLFW_KEY_LEFT_CONTROL) ==
         GLFW_PRESS) {
       cam.moveFast = true;
     }
@@ -78,7 +79,6 @@ public:
     float time = glfwGetTime();
     raytracerShader.setFloat("time", time);
     raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
-    raytracerShader.setFloat("vfov", vfov);
   }
 
   void onWindowResize(GLFWwindow *window, int width, int height) override {
@@ -122,6 +122,5 @@ private:
 
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);
-  int samplesPerPixel = 10;
-  float vfov = glm::radians(90.0);
+  int samplesPerPixel = 8;
 };

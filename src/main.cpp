@@ -1,15 +1,7 @@
-#include "RandomBoxesScene.h"
 #include "RayTracedScene.h"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/matrix_projection.hpp"
-#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float3.hpp"
-#include "glm/trigonometric.hpp"
 #include "model.h"
 #include "scene.h"
-#include "screenToWorldSpace.h"
-#include <complex>
 #include <cstdlib>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -18,9 +10,6 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <ostream>
-#include "rayTracingCamera.h"
-#include "camera.h"
-#include "MoveObjectsWithMouseScene.h"
 #include "InputState.h"
 
 glm::vec3 movementVector;
@@ -29,6 +18,9 @@ Scene *Scene::current = nullptr;
 WindowState globalWindowState{nullptr, 800, 600};
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+  if (Scene::current) {
+    Scene::current->onWindowResize(window, width, height);
+  }
   glViewport(0, 0, width, height);
   globalWindowState.width = width;
   globalWindowState.height = height;

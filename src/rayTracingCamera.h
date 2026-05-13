@@ -2,6 +2,7 @@
 #include <cmath>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include "glm/common.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/geometric.hpp"
 #include "glm/trigonometric.hpp"
@@ -13,8 +14,9 @@ public:
   float yaw = 90.0f;
   int width;
   int height;
-  float fov = 45.0f;
-  glm::vec3 v = glm::vec3(0.0f, -1.0f, 0.0f);
+  float vfov = 45.0f;
+
+  glm::vec3 v = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 vup = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 w = glm::vec3(0.0f, 0.0f, -1.0f);
   glm::vec3 u = glm::vec3(1.0f, 0.0f, 0.0f);
@@ -32,15 +34,14 @@ public:
   void initCamera() {
     frame = 1;
     aspectRatio = float(width) / float(height);
-    w = glm::vec3(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
+
+    w = -glm::normalize(
+        glm::vec3(cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
                   sin(glm::radians(pitch)),
-                  cos(glm::radians(pitch)) * sin(glm::radians(yaw)));
-    w = glm::normalize(w);
-    u = glm::normalize(glm::cross(w, vup)); // right
+                  sin(glm::radians(yaw)) * cos(glm::radians(pitch))));
+    u = glm::cross(w, vup);
     v = glm::cross(w, u);
-    // v = glm::vec3(v, 1.0f);
-    // u = lookAtMatrix() * glm::vec4(u, 1.0f);
-    float viewPortHeight = 2.0 * tan(glm::radians(fov / 2)) * focal_length;
+    float viewPortHeight = 2.0 * tan(glm::radians(vfov / 2)) * focal_length;
     float viewPortWidth = aspectRatio * viewPortHeight;
     glm::vec3 viewPort_u = u * viewPortWidth;
     glm::vec3 viewPort_v = v * viewPortHeight;
@@ -53,12 +54,13 @@ public:
 
     shader.use();
     shader.setVec3("camera_position", position);
-    shader.setInt("width", width / 2);
-    shader.setInt("height", height / 2);
+    shader.setInt("width", width);
+    shader.setInt("height", height);
     shader.setVec3("delta_u", delta_u);
     shader.setVec3("delta_v", delta_v);
     shader.setVec3("firstPixelLocation", firstPixelLocation);
     shader.setFloat("focal_length", focal_length);
+    shader.setUInt("vfov", vfov);
   }
 
   void move(GLFWwindow *window, float deltaTime) {
@@ -74,6 +76,12 @@ public:
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
       movementVector += u;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+      movementVector += vup;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+      movementVector -= vup;
     }
     auto speed = slowSpeed;
     if (moveFast) {
@@ -100,6 +108,7 @@ public:
     }
     yaw += dx * camSensitivity;
     pitch -= (dy * camSensitivity);
+    pitch = glm::clamp(pitch, -89.0f, 89.0f);
     initCamera();
   }
 

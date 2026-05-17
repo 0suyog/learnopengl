@@ -14,10 +14,24 @@ struct node {
   int triEnd;
 };
 
+struct arrayNode {
+  bool isLeafNode;
+  int leftInd;
+  int rightInd;
+  glm::vec3 min;
+  glm::vec3 max;
+};
+
 class bvh {
 public:
-  node *head;
+  std::unique_ptr<node> head;
   std::vector<Triangle> triangles;
+
+  bvh(std::vector<Triangle> _triangles) {
+    triangles = _triangles;
+    head = split(std::make_unique<node>(node{
+        .isLeafNode = false, .triStart = 0, .triEnd = int(_triangles.size())}));
+  };
 
 private:
   std::unique_ptr<node> split(std::unique_ptr<node> parentNode) {
@@ -37,7 +51,6 @@ private:
       if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 1) {
         leftSide++;
       } else if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 2) {
-        leftSide++;
         rightSide--;
       } else {
         std::swap(triangles[leftSide], triangles[rightSide]);

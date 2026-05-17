@@ -131,7 +131,6 @@ int main() {
 
   RayTracedScene rayTracedScene;
   rayTracedScene.init();
-
   // RandomBoxScenes randomBoxesScene;
   // randomBoxesScene.init();
 

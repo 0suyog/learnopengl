@@ -76,6 +76,12 @@ public:
     return bbox.hit(modelSpaceRay, closest);
   }
 
+  void loadTrianglesForRayTracing(Shader &shader, glm::mat4 model_matrix) {
+    for (auto mesh : meshes) {
+      mesh.loadTrianglesForRayTracing(shader, model_matrix);
+    }
+  }
+
 private:
   std::vector<Mesh> meshes;
   std::string directory;

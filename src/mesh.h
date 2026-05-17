@@ -17,6 +17,16 @@ struct Triangle {
   glm::vec2 uv1, uv2, uv3;
   bool oneSided;
   float D;
+
+  glm::vec3 centroid() { return (p1 + p2 + p3) / 3.0f; }
+
+  // if 1 then left if 2 then right for bvh
+  int leftOrRight(int axis, float min, float mid, float max) {
+    if (centroid()[axis] < mid) {
+      return 1;
+    }
+    return 2;
+  }
 };
 
 struct Texture {
@@ -60,21 +70,31 @@ public:
   }
 
   void loadTrianglesForRayTracing(Shader &shader, glm::mat4 model_matrix) {
-    Triangle triangles[vertices.size() / 3];
-    for (int i = 0; i < vertices.size(); i += 3) {
-      glm::vec3 p1 = model_matrix * glm::vec4(vertices[i].Position, 1.0f);
-      glm::vec3 p2 = model_matrix * glm::vec4(vertices[i + 1].Position, 1.0f);
-      glm::vec3 p3 = model_matrix * glm::vec4(vertices[i + 2].Position, 1.0f);
+    Triangle triangles[indices.size() / 3];
+    for (int i = 0; i < indices.size(); i += 3) {
+      glm::vec3 p1 =
+          model_matrix * glm::vec4(vertices[indices[i]].Position, 1.0f);
+      glm::vec3 p2 =
+          model_matrix * glm::vec4(vertices[indices[i + 1]].Position, 1.0f);
+      glm::vec3 p3 =
+          model_matrix * glm::vec4(vertices[indices[i + 2]].Position, 1.0f);
       glm::vec3 normal = glm::normalize(glm::cross(p3 - p1, p2 - p1));
 
-      glm::vec2 uv1 = vertices[i].TexCoords;
-      glm::vec2 uv2 = vertices[i + 1].TexCoords;
-      glm::vec2 uv3 = vertices[i + 2].TexCoords;
+      glm::vec2 uv1 = vertices[indices[i]].TexCoords;
+      glm::vec2 uv2 = vertices[indices[i + 1]].TexCoords;
+      glm::vec2 uv3 = vertices[indices[i + 2]].TexCoords;
       float D = glm::dot(normal, p1);
-      triangles[i / 3] =
-          Triangle{p1, p2, p3, .n = normal, uv1, uv2, uv3, false, D};
+      triangles[i / 3] = Triangle{.p1 = p1,
+                                  .p2 = p2,
+                                  .p3 = p3,
+                                  .n = normal,
+                                  .uv1 = uv1,
+                                  .uv2 = uv2,
+                                  .uv3 = uv3,
+                                  .oneSided = false,
+                                  .D = D};
     }
-    for (int i = 0; i < vertices.size() / 3; i++) {
+    for (int i = 0; i < indices.size() / 3; i++) {
       auto triangle = triangles[i];
       auto p1_name = "triangles[" + std::to_string(i) + "].p1";
       auto p2_name = "triangles[" + std::to_string(i) + "].p2";

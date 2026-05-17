@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include "InputState.h"
+#include "glm/ext/matrix_transform.hpp"
+#include "model.h"
 #include "scene.h"
 #include "shader.h"
 #include "rayTracingCamera.h"
@@ -55,6 +57,10 @@ public:
 
     raytracerShader.use();
     raytracerShader.setInt("prevTexture", 0);
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::scale(model, glm::vec3(100.0f));
+    // model = glm::translate(model, glm::vec3(200.0f));
+    pawn.loadTrianglesForRayTracing(raytracerShader, model);
 
     displayShader.use();
     displayShader.setInt("rayTracedScene", 0);
@@ -119,6 +125,8 @@ private:
 
   Shader displayShader = Shader("../shaders/rayTracerDisplay.vert",
                                 "../shaders/rayTracerDisplay.frag");
+
+  Model pawn = Model("../models/pawn/LOW_POLY_piece_Pawn.obj");
 
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);

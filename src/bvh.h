@@ -1,0 +1,100 @@
+#include "boundingbox.h"
+#include "interval.h"
+#include "mesh.h"
+#include <algorithm>
+#include <memory>
+#include <utility>
+#include <vector>
+struct node {
+  bool isLeafNode;
+  std::unique_ptr<node> left;
+  std::unique_ptr<node> right;
+  boundingBox bbox;
+  int triStart;
+  int triEnd;
+};
+
+class bvh {
+public:
+  node *head;
+  std::vector<Triangle> triangles;
+
+private:
+  std::unique_ptr<node> split(std::unique_ptr<node> parentNode) {
+    if (parentNode->triEnd - parentNode->triStart < 10) {
+      parentNode->isLeafNode = true;
+      return parentNode;
+    }
+    int axis = parentNode->bbox.splittingAxis();
+    float min, max, mid;
+    parentNode->bbox.getAxisValue(axis, min, max, mid);
+    bool partitioned = false;
+    int partitionPoint = parentNode->triStart + parentNode->triEnd / 2;
+    int leftSide = parentNode->triStart;
+    int rightSide = parentNode->triEnd;
+
+    while (leftSide <= rightSide) {
+      if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 1) {
+        leftSide++;
+      } else if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 2) {
+        leftSide++;
+        rightSide--;
+      } else {
+        std::swap(triangles[leftSide], triangles[rightSide]);
+        leftSide++;
+        rightSide--;
+      }
+    }
+
+    partitionPoint = leftSide;
+
+    if (partitionPoint == parentNode->triStart ||
+        partitionPoint == parentNode->triEnd) {
+      parentNode->isLeafNode = true;
+      return parentNode;
+    }
+
+    float minX = infinity, minY = infinity, minZ = infinity;
+    float maxX = -infinity, maxY = -infinity, maxZ = -infinity;
+    for (int i = parentNode->triStart; i < partitionPoint; i++) {
+      const auto &t = triangles[i];
+
+      minX = std::min({minX, t.p1.x, t.p2.x, t.p3.x});
+      minY = std::min({minY, t.p1.y, t.p2.y, t.p3.y});
+      minZ = std::min({minZ, t.p1.z, t.p2.z, t.p3.z});
+
+      maxX = std::max({maxX, t.p1.x, t.p2.x, t.p3.x});
+      maxY = std::max({maxY, t.p1.y, t.p2.y, t.p3.y});
+      maxZ = std::max({maxZ, t.p1.z, t.p2.z, t.p3.z});
+    }
+
+    auto left_node = std::make_unique<node>(
+        node{.isLeafNode = false,
+             .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
+             .triStart = parentNode->triStart,
+             .triEnd = partitionPoint});
+    parentNode->left = split(std::move(left_node));
+
+    minX = infinity, minY = infinity, minZ = infinity;
+    maxX = -infinity, maxY = -infinity, maxZ = -infinity;
+
+    for (int i = partitionPoint; i < parentNode->triEnd; i++) {
+      const auto &t = triangles[i];
+
+      minX = std::min({minX, t.p1.x, t.p2.x, t.p3.x});
+      minY = std::min({minY, t.p1.y, t.p2.y, t.p3.y});
+      minZ = std::min({minZ, t.p1.z, t.p2.z, t.p3.z});
+
+      maxX = std::max({maxX, t.p1.x, t.p2.x, t.p3.x});
+      maxY = std::max({maxY, t.p1.y, t.p2.y, t.p3.y});
+      maxZ = std::max({maxZ, t.p1.z, t.p2.z, t.p3.z});
+    }
+    auto right_node = std::make_unique<node>(
+        node{.isLeafNode = false,
+             .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
+             .triStart = partitionPoint,
+             .triEnd = parentNode->triEnd});
+    parentNode->right = split(std::move(right_node));
+    return parentNode;
+  }
+};

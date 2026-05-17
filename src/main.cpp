@@ -1,7 +1,9 @@
+#include "MoveObjectsWithMouseScene.h"
 #include "RayTracedScene.h"
 #include "glm/ext/vector_float3.hpp"
 #include "model.h"
 #include "scene.h"
+#include "screenToWorldSpace.h"
 #include <cstdlib>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

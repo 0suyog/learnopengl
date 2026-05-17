@@ -1,9 +1,9 @@
 #pragma once
 #include "interval.h"
 #include "ray.h"
-#include <iostream>
 class boundingBox {
 public:
+  interval xInterval, yInterval, zInterval;
   boundingBox() = default;
   boundingBox(float maxX, float maxY, float maxZ, float minX, float minY,
               float minZ) {
@@ -31,6 +31,36 @@ public:
     return tmin < tmax;
   }
 
-private:
-  interval xInterval, yInterval, zInterval;
+  int splittingAxis() {
+    if (xInterval.size() > yInterval.size() &&
+        xInterval.size() > zInterval.size()) {
+      return 0;
+    }
+    if (yInterval.size() > xInterval.size() &&
+        yInterval.size() > zInterval.size()) {
+      return 1;
+    }
+    if (zInterval.size() > xInterval.size() &&
+        zInterval.size() > yInterval.size()) {
+      return 2;
+    }
+  }
+
+  void getAxisValue(int axis, float &min, float &mid, float &max) {
+    if (axis == 1) {
+      min = xInterval.min;
+      max = xInterval.max;
+      mid = (xInterval.max + xInterval.min) / 2;
+    }
+    if (axis == 2) {
+      min = yInterval.min;
+      max = yInterval.max;
+      mid = (yInterval.max + yInterval.min) / 2;
+    }
+    if (axis == 3) {
+      min = yInterval.min;
+      max = yInterval.max;
+      mid = (yInterval.max + yInterval.min) / 2;
+    }
+  }
 };

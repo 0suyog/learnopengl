@@ -1,4 +1,5 @@
-#version 330 core
+#version 460 core
+#define MAX_TRIANGLE 300
 in vec3 FragPosition;
 out vec4 FragColor;
 uniform float time;
@@ -31,19 +32,6 @@ struct Material{
   float fuzz;
 };
 
-Material materials[2];
-  materials[0].type = METAL;
-  materials[0].albedo = vec3(0.8, 0.6, 0.7);
-  materials[0].fuzz = 0.7f;
-
-  materials[1].type = LAMBERTIAN;
-  materials[1].albedo = vec3(0.4, 0.1, 0.7);
-  materials[1].fuzz = 0.7f;
-
-struct MTL{
-  int texInd;
-  vec3 emission;
-};
 
 struct ReceivedTriangle{
   vec3 p1, p2, p3;
@@ -54,8 +42,12 @@ struct ReceivedTriangle{
   int matInd;
 };
 
-ReceivedTriangle triangles[10];
+uniform ReceivedTriangle triangles[MAX_TRIANGLE] ;
 
+struct MTL{
+  int texInd;
+  vec3 emission;
+};
 
 struct Sphere {
   vec3 origin;
@@ -284,7 +276,7 @@ bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
   return true;
 }
 
-bool hitTriangle(Triangle tri, Ray r, inout HitInfo ht, float closest ){
+bool hitTriangle(ReceivedTriangle tri, Ray r, inout HitInfo ht, float closest ){
   float denom = dot(tri.n,r.direction);
   if (abs( denom ) <= 1e-8){
 	 // return vec3(1.0,0.0,0.0); // red for parallel
@@ -313,14 +305,19 @@ bool hitTriangle(Triangle tri, Ray r, inout HitInfo ht, float closest ){
 	 return false;
   }
   bool frontFace=isFrontFace(r.direction,tri.n);
-  if (tri.oneSided){
-	 if (!frontFace){
-		// return vec3(0.0,0.0,0.0);
-		return false;
-	 }
-  }
+  // if (tri.oneSided){
+  // if (!frontFace){
+  // // return vec3(0.0,0.0,0.0);
+  // return false;
+  // }
+  // }
   vec3 n = isFrontFace(r.direction,tri.n) ? tri.n: -tri.n;
-  ht = newHitInfo(p, n, t, tri.mat);
+  Material blue_metal;
+  blue_metal.type = LAMBERTIAN;
+  blue_metal.albedo = vec3(0.4, 0.5, 0.9);
+  blue_metal.emission = vec3(200.0,200.0,200.0);
+  blue_metal.fuzz = 0.0f;
+  ht = newHitInfo(p, n, t, blue_metal);
   // return vec3(1.0,1.0,0.0); // yellow for hit
   return true;
 }
@@ -358,11 +355,11 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
 }
 
 
-bool hitTriangles(Triangle[1] world,Ray r,inout HitInfo h, float closest){
+bool hitTriangles(ReceivedTriangle[MAX_TRIANGLE] world,Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
   float closestSoFar=closest;
   bool hitAnything=false;
-  for (int i=0;i<1;i++){
+  for (int i=0;i<MAX_TRIANGLE;i++){
   // return hitTriangle(world[0],r,tempHit, closestSoFar);
 	 if (hitTriangle(world[i],r,tempHit, closestSoFar)){
 	 hitAnything=true;
@@ -420,8 +417,7 @@ vec3 emit(in Ray r_in,in HitInfo h){
   }
 }
 
-
-vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, Triangle[1] triangles, int maxDepth){
+vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, ReceivedTriangle[MAX_TRIANGLE] triangles, int maxDepth){
   vec3 color = vec3(0.0,0.0,0.0);
   vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
@@ -439,21 +435,21 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, Triangle[1] triangles, int ma
 	 if(hitAnything){
 		closest = h.t;
 	 }
-	   if(hitQuads(quads,r,h,closest)){
-	 hitAnything=true;
-	 }
+	 // if(hitQuads(quads,r,h,closest)){
+	 // hitAnything=true;
+	 // }
 	 if (hitAnything){
 		closest = h.t;
 	 }
 	 // return hitTriangles(triangles,r,h,closest);
 	 if (hitTriangles(triangles,r,h,closest)){
-		hitAnything = true;
-	 // return vec3(1.0,0.0,1.0);
+		// return h.normal;
+	 hitAnything = true;
 	 }
 	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
-		// return vec3(0.0,0.0,0.0);
-		return vec3(0.6,0.3,0.2);
+		return vec3(0.0,0.0,0.0);
+		// return vec3(0.6,0.3,0.2);
 
 	 }
 	 // return ( h.normal+1 )*0.5;
@@ -482,7 +478,7 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, Triangle[1] triangles, int ma
   return color;
 }
 
-vec3 multiSampleLoop(Sphere[3] world,Quad[7] q, Triangle[1] tri,int samplesPerPixel,vec3 origin, vec3 fragCoord){
+vec3 multiSampleLoop(Sphere[3] world,Quad[7] q, ReceivedTriangle[MAX_TRIANGLE] tri,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
 	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5),0.0);
@@ -578,16 +574,17 @@ void main() {
   light.albedo=vec3(0.58, 0.173, 0.259);
   red.albedo=vec3(0.85,0.4,0.4);
   green.albedo = vec3( 0.12,0.45,0.15 );
-  light.emission = vec3(150.0,10.0,10.0);
-  s[0].origin = vec3(80.0, 40.0, 60.0);
+  light.emission = vec3(150.0);
+  // s[0].origin = vec3(80.0, 40.0, 60.0);
+  s[0].origin = camera_position+100;
   s[0].radius = 40;
-  s[0].mat = red;
+  s[0].mat = light;
   s[1].origin = vec3(200.0, 120.0, 400.0);
   s[1].radius = 100.0;
-  s[1].mat = green;
+  s[1].mat = blue_metal;
   s[2].origin = vec3(400.0, 150.0, 300.0);
   s[2].radius = 40.0;
-  s[2].mat = light;
+  s[2].mat = green;
 
   Triangle t[1];
 
@@ -627,7 +624,7 @@ void main() {
 	 vec3(-130, 0, 0),
 	 vec3(0, 0, -105)
   );
-  q[2].mat = red_diffuse;
+  q[2].mat = light;
   // q[2].oneSided = false; // IMPORTANT: leave it off
 
 
@@ -675,7 +672,7 @@ void main() {
   coord.y*=height;
   coord.z = -focal_length;
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
-  vec3 color = multiSampleLoop(s,q,t,uSamplesPerPixel,camera_position,viewPortPixelCoord);
+  vec3 color = multiSampleLoop(s,q,triangles,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
 

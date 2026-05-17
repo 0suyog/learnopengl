@@ -130,5 +130,5 @@ private:
 
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);
-  int samplesPerPixel = 8;
+  int samplesPerPixel = 4;
 };

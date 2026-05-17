@@ -1,4 +1,4 @@
-#version 330
+#version 460
 in vec3 pos;
 out vec4 FragColor;
 uniform sampler2D rayTracedScene;

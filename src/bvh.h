@@ -1,3 +1,4 @@
+#pragma once
 #include "boundingbox.h"
 #include "interval.h"
 #include "mesh.h"
@@ -24,10 +25,20 @@ struct arrayNode {
   int triEnd;
 };
 
+struct ShaderNode {
+  // first 6 store minx, miny, minz, maxx and so on and second last is to see if
+  // is leaf node and lastis for padding
+  std::array<float, 8> minmax;
+  // triStart,triEnd, left ind, right ind
+  std::array<int, 4> indices;
+};
+
 class bvh {
 public:
   std::shared_ptr<node> head;
   std::vector<Triangle> triangles;
+
+  bvh() {};
 
   bvh(std::vector<Triangle> _triangles) {
     triangles = _triangles;
@@ -114,18 +125,27 @@ private:
   }
 };
 
-inline int toArray(const std::shared_ptr<node> n, std::vector<arrayNode> &ans) {
-  arrayNode an = arrayNode{.min = n->bbox.minValues(),
-                           .isLeafNode = n->isLeafNode,
-                           .max = n->bbox.maxValues(),
-                           .triStart = n->triStart,
-                           .triEnd = n->triEnd};
-  ans.push_back(an);
-  int ind = ans.size() - 1;
-  if (an.isLeafNode) {
+inline int toArray(const std::shared_ptr<node> n,
+                   std::vector<ShaderNode> &shaderNodes) {
+  ShaderNode sn;
+  auto bboxMax = n->bbox.maxValues();
+  auto bboxMin = n->bbox.minValues();
+  sn.minmax = {bboxMin.x,
+               bboxMin.y,
+               bboxMin.z,
+               bboxMax.x,
+               bboxMax.y,
+               bboxMax.z,
+               float(n->isLeafNode),
+               0.0};
+  sn.indices = {n->triStart, n->triEnd};
+
+  shaderNodes.push_back(sn);
+  int ind = shaderNodes.size() - 1;
+  if (n->isLeafNode) {
     return ind;
   }
-  ans[ind].leftInd = toArray(n->left, ans);
-  ans[ind].rightInd = toArray(n->right, ans);
+  shaderNodes[ind].indices[2] = toArray(n->left, shaderNodes);
+  shaderNodes[ind].indices[3] = toArray(n->right, shaderNodes);
   return ind;
 }

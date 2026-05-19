@@ -2,6 +2,7 @@
 #include "glm/ext/quaternion_geometric.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "shader.h"
+#include <array>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -27,6 +28,11 @@ struct Triangle {
     }
     return 2;
   }
+};
+
+struct ShaderTriangle {
+  std::array<float, 12> triangles;
+  std::array<float, 8> uvs;
 };
 
 struct Texture {
@@ -69,8 +75,8 @@ public:
     glBindVertexArray(0);
   }
 
-  void loadTrianglesForRayTracing(Shader &shader, glm::mat4 model_matrix) {
-    Triangle triangles[indices.size() / 3];
+  std::vector<Triangle> getTriangles(glm::mat4 model_matrix) const {
+    std::vector<Triangle> triangles(indices.size() / 3);
     for (int i = 0; i < indices.size(); i += 3) {
       glm::vec3 p1 =
           model_matrix * glm::vec4(vertices[indices[i]].Position, 1.0f);
@@ -94,6 +100,11 @@ public:
                                   .oneSided = false,
                                   .D = D};
     }
+    return triangles;
+  }
+
+  void loadTrianglesForRayTracing(Shader &shader, glm::mat4 model_matrix) {
+    auto triangles = getTriangles(model_matrix);
     for (int i = 0; i < indices.size() / 3; i++) {
       auto triangle = triangles[i];
       auto p1_name = "triangles[" + std::to_string(i) + "].p1";
@@ -147,3 +158,12 @@ private:
     glBindVertexArray(0);
   }
 };
+
+ShaderTriangle TriangleToShaderTriangle(const Triangle &t) {
+  ShaderTriangle st;
+  st.triangles = {t.p1.x, t.p1.y, t.p1.z, t.p2.x, t.p2.y, t.p2.z,
+                  t.p3.x, t.p3.y, t.p3.z, t.n.x,  t.n.y,  t.n.z};
+  st.uvs = {t.uv1.x, t.uv1.y, t.uv2.x, t.uv2.y,
+            t.uv3.x, t.uv3.y, t.D,     float(t.oneSided)};
+  return st;
+}

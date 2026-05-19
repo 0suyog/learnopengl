@@ -11,6 +11,7 @@
 #include <assimp/Importer.hpp>
 #include <iostream>
 #include <string>
+#include <vector>
 #include "stb_image.h"
 #include "boundingbox.h"
 
@@ -67,6 +68,15 @@ public:
 
   glm::mat4 applyTransformation(const glm::mat4 &t) {
     return transformation * t;
+  }
+
+  std::vector<Triangle> allTriangles(glm::mat4 model_matrix) {
+    std::vector<Triangle> triangles;
+    for (const auto &mesh : meshes) {
+      auto meshTrigs = mesh.getTriangles(model_matrix);
+      triangles.insert(triangles.end(), meshTrigs.begin(), meshTrigs.end());
+    }
+    return triangles;
   }
 
   const glm::mat4 &modelMatrix() const { return transformation; }

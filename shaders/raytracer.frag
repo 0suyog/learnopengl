@@ -1,5 +1,4 @@
 #version 460 core
-#define MAX_TRIANGLE 300
 in vec3 FragPosition;
 out vec4 FragColor;
 uniform float time;
@@ -21,6 +20,8 @@ const uint NORMAL = 3u;
 const uint LIGHT = 4u;
 const uint DIELECTRIC = 5u;
 
+int triangleCount = 0;
+
 
 struct Material{
   uint type;
@@ -39,10 +40,68 @@ struct ReceivedTriangle{
   vec2 uv1, uv2, uv3;
   bool oneSided;
   float D;
-  int matInd;
 };
 
-uniform ReceivedTriangle triangles[MAX_TRIANGLE] ;
+struct ShaderTriangle{
+  float triangles[12];
+  float uvs[8];
+};
+
+layout(std430, binding=1) buffer TrianglesLayout{
+  ShaderTriangle triangles[];
+};
+
+ReceivedTriangle shaderTriangleToTriangle(
+    in ShaderTriangle trig
+){
+    ReceivedTriangle rt;
+
+    rt.p1 = vec3(
+        trig.triangles[0],
+        trig.triangles[1],
+        trig.triangles[2]
+    );
+
+    rt.p2 = vec3(
+        trig.triangles[3],
+        trig.triangles[4],
+        trig.triangles[5]
+    );
+
+    rt.p3 = vec3(
+        trig.triangles[6],
+        trig.triangles[7],
+        trig.triangles[8]
+    );
+
+    rt.n = vec3(
+        trig.triangles[9],
+        trig.triangles[10],
+        trig.triangles[11]
+    );
+
+    rt.uv1 = vec2(
+        trig.uvs[0],
+        trig.uvs[1]
+    );
+
+    rt.uv2 = vec2(
+        trig.uvs[2],
+        trig.uvs[3]
+    );
+
+    rt.uv3 = vec2(
+        trig.uvs[4],
+        trig.uvs[5]
+    );
+
+    rt.D = trig.uvs[6];
+    rt.oneSided = trig.uvs[7] > 0.5;
+
+    return rt;
+}
+
+// uniform ReceivedTriangle triangles[MAX_TRIANGLE] ;
 
 struct MTL{
   int texInd;
@@ -284,7 +343,7 @@ bool hitTriangle(ReceivedTriangle tri, Ray r, inout HitInfo ht, float closest ){
   }
   float np = dot(tri.n,r.origin);
   float t = (tri.D-np)/denom;
-  if (t<0.01 || t>=closest){
+  if (t<0.1 || t>=closest){
 	 // return vec3(0.0,1.0,0.0); // green for farther
 	 return false;
   }
@@ -354,14 +413,12 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
   return hitAnything;
 }
 
-
-bool hitTriangles(ReceivedTriangle[MAX_TRIANGLE] world,Ray r,inout HitInfo h, float closest){
+bool hitTriangles(Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
   float closestSoFar=closest;
   bool hitAnything=false;
-  for (int i=0;i<MAX_TRIANGLE;i++){
-  // return hitTriangle(world[0],r,tempHit, closestSoFar);
-	 if (hitTriangle(world[i],r,tempHit, closestSoFar)){
+  for (int i=0;i<triangleCount;i++){
+	 if (hitTriangle(shaderTriangleToTriangle( triangles[i] ),r,tempHit, closestSoFar)){
 	 hitAnything=true;
 	 if (tempHit.t<closestSoFar){
 	 	 closestSoFar = tempHit.t;
@@ -417,7 +474,7 @@ vec3 emit(in Ray r_in,in HitInfo h){
   }
 }
 
-vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, ReceivedTriangle[MAX_TRIANGLE] triangles, int maxDepth){
+vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
   vec3 color = vec3(0.0,0.0,0.0);
   vec3 throughPut=vec3(1.0,1.0,1.0);
   for (int i=0;i<maxDepth+1;i++){
@@ -435,17 +492,17 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, ReceivedTriangle[MAX_TRIANGLE
 	 if(hitAnything){
 		closest = h.t;
 	 }
-	 if(hitQuads(quads,r,h,closest)){
-	 hitAnything=true;
-	 }
+	 // if(hitQuads(quads,r,h,closest)){
+	 // hitAnything=true;
+	 // }
 	 if (hitAnything){
 		closest = h.t;
 	 }
 	 // return hitTriangles(triangles,r,h,closest);
-	 // if (hitTriangles(triangles,r,h,closest)){
-	 // // return h.normal;
-	 // hitAnything = true;
-	 // }
+	 if (hitTriangles(r,h,closest)){
+	 // return h.normal;
+	 hitAnything = true;
+	 }
 	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
 		return vec3(0.0,0.0,0.0);
@@ -478,20 +535,21 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, ReceivedTriangle[MAX_TRIANGLE
   return color;
 }
 
-vec3 multiSampleLoop(Sphere[3] world,Quad[7] q, ReceivedTriangle[MAX_TRIANGLE] tri,int samplesPerPixel,vec3 origin, vec3 fragCoord){
+vec3 multiSampleLoop(Sphere[3] world,Quad[7] q,int samplesPerPixel,vec3 origin, vec3 fragCoord){
   vec3 color=vec3(0.0);
   for (int i=0;i<samplesPerPixel;i++){
 	 vec3 randomSample = vec3((randVec2(fragCoord.xy+i)-0.5),0.0);
 	 vec3 offset = randomSample.x*delta_u + randomSample.y*delta_v;
 	 vec3 rayDir = normalize(( fragCoord-origin )+offset);
 	 Ray r = createRay(origin,rayDir);
-	 color+= rayColor(r,world,q,tri,4);
+	 color+= rayColor(r,world,q,4);
   }
   color= color/samplesPerPixel;
   return color;
 }
 
 void main() {
+  triangleCount = triangles.length();
   Material white_diffuse;
   white_diffuse.type = LAMBERTIAN;
   white_diffuse.albedo = vec3(0.73, 0.73, 0.73);
@@ -672,11 +730,13 @@ void main() {
   coord.y*=height;
   coord.z = -focal_length;
   vec3 viewPortPixelCoord = firstPixelLocation + (coord.x*delta_u) - (coord.y*delta_v);
-  vec3 color = multiSampleLoop(s,q,triangles,uSamplesPerPixel,camera_position,viewPortPixelCoord);
+  vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
 
   if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
-	 FragColor = vec4(0.0, 1, 0.0,1.0);
+  FragColor = vec4(0.0, 1, 0.0,1.0);
   }
+  // triangles.length();
+  // FragColor = vec4(triangles.length(),0.0,0.0,1.0);
 }

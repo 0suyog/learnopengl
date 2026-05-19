@@ -4,10 +4,12 @@
 #include <iostream>
 #include "InputState.h"
 #include "glm/ext/matrix_transform.hpp"
+#include "mesh.h"
 #include "model.h"
 #include "scene.h"
 #include "shader.h"
 #include "rayTracingCamera.h"
+#include "bvh.h"
 class RayTracedScene : public Scene {
 
 public:
@@ -57,10 +59,10 @@ public:
 
     raytracerShader.use();
     raytracerShader.setInt("prevTexture", 0);
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::scale(model, glm::vec3(100.0f));
-    // model = glm::translate(model, glm::vec3(200.0f));
-    pawn.loadTrianglesForRayTracing(raytracerShader, model);
+    // glm::mat4 model = glm::mat4(1.0f);
+    // model = glm::scale(model, glm::vec3(100.0f));
+    // // model = glm::translate(model, glm::vec3(200.0f));
+    // pawn.loadTrianglesForRayTracing(raytracerShader, model);
 
     displayShader.use();
     displayShader.setInt("rayTracedScene", 0);
@@ -73,6 +75,8 @@ public:
     cam.pitch = 0.0f;
     cam.vfov = 60;
     cam.camSensitivity = 0.1f;
+
+    loadModels();
   }
   void update(float deltaTime) override {
     if (glfwGetKey(globalWindowState.window, GLFW_KEY_LEFT_CONTROL) ==
@@ -118,6 +122,25 @@ public:
     glad_glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   }
 
+  void loadModels() {
+    // auto pawn = Model("../models/pawn/LOW_POLY_piece_Pawn.obj");
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::scale(model, glm::vec3(100.0f));
+    auto pawnTrigs = pawn.allTriangles(model);
+    triangles.insert(triangles.end(), pawnTrigs.begin(), pawnTrigs.end());
+    // ssbo for triangles
+    glGenBuffers(1, &trianglesSsbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, trianglesSsbo);
+    ShaderTriangle shaderTriangles[triangles.size()];
+    for (int i = 0; i < triangles.size(); i++) {
+      shaderTriangles[i] = TriangleToShaderTriangle(triangles[i]);
+    }
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(shaderTriangles),
+                 shaderTriangles, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, trianglesSsbo);
+    // b = bvh(triangles);
+  }
+
 private:
   float canvasVertices[12] = {
       -1.0f, 1.0f,  0.0f, // top left
@@ -129,7 +152,7 @@ private:
   unsigned int canvasIndices[6] = {0, 1, 2, 3, 0, 2};
 
   unsigned int raytracerVAO, raytracerEBO, raytracerVBO, raytracerFBO,
-      rayTracerTexture, raytracerRBO;
+      rayTracerTexture, raytracerRBO, trianglesSsbo;
 
   Shader raytracerShader =
       Shader("../shaders/raytracer.vert", "../shaders/raytracer.frag");
@@ -142,4 +165,8 @@ private:
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);
   int samplesPerPixel = 4;
+
+  std::vector<Triangle> triangles;
+  std::vector<arrayNode> nodes;
+  bvh b = bvh();
 };

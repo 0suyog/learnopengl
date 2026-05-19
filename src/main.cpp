@@ -123,6 +123,10 @@ int main() {
   glfwSetMouseButtonCallback(window, mouseButtonCallback);
   glfwSetScrollCallback(window, mouseScrollCallback);
 
+  // if (glfwRawMouseMotionSupported()) {
+  //   glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  // }
+
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
   stbi_set_flip_vertically_on_load_thread(true);
@@ -142,6 +146,7 @@ int main() {
   // randomBoxesScene.init();
 
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
   while (!glfwWindowShouldClose(window)) {
     frame++;
     float currentFrame = glfwGetTime();

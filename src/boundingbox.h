@@ -1,4 +1,5 @@
 #pragma once
+#include "glm/common.hpp"
 #include "interval.h"
 #include "ray.h"
 class boundingBox {
@@ -12,7 +13,7 @@ public:
     zInterval = interval(minZ, maxZ);
   }
 
-  bool hit(Ray r, float closest) {
+  bool hit(Ray r, float closest) const {
     float xo = r.origin.x;
     float yo = r.origin.y;
     float zo = r.origin.z;
@@ -31,22 +32,18 @@ public:
     return tmin < tmax;
   }
 
-  int splittingAxis() {
+  int splittingAxis() const {
     if (xInterval.size() > yInterval.size() &&
         xInterval.size() > zInterval.size()) {
       return 0;
-    }
-    if (yInterval.size() > xInterval.size() &&
-        yInterval.size() > zInterval.size()) {
+    } else if (yInterval.size() > xInterval.size() &&
+               yInterval.size() > zInterval.size()) {
       return 1;
     }
-    if (zInterval.size() > xInterval.size() &&
-        zInterval.size() > yInterval.size()) {
-      return 2;
-    }
+    return 2;
   }
 
-  void getAxisValue(int axis, float &min, float &mid, float &max) {
+  void getAxisValue(int axis, float &min, float &mid, float &max) const {
     if (axis == 1) {
       min = xInterval.min;
       max = xInterval.max;
@@ -62,5 +59,13 @@ public:
       max = yInterval.max;
       mid = (yInterval.max + yInterval.min) / 2;
     }
+  }
+
+  glm::vec3 maxValues() const {
+    return glm::vec3(xInterval.max, yInterval.max, zInterval.max);
+  }
+
+  glm::vec3 minValues() const {
+    return glm::vec3(xInterval.min, yInterval.min, zInterval.min);
   }
 };

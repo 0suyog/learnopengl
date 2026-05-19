@@ -7,34 +7,36 @@
 #include <vector>
 struct node {
   bool isLeafNode;
-  std::unique_ptr<node> left;
-  std::unique_ptr<node> right;
+  std::shared_ptr<node> left;
+  std::shared_ptr<node> right;
   boundingBox bbox;
   int triStart;
   int triEnd;
 };
 
 struct arrayNode {
+  glm::vec3 min;
   bool isLeafNode;
+  glm::vec3 max;
   int leftInd;
   int rightInd;
-  glm::vec3 min;
-  glm::vec3 max;
+  int triStart;
+  int triEnd;
 };
 
 class bvh {
 public:
-  std::unique_ptr<node> head;
+  std::shared_ptr<node> head;
   std::vector<Triangle> triangles;
 
   bvh(std::vector<Triangle> _triangles) {
     triangles = _triangles;
-    head = split(std::make_unique<node>(node{
+    head = split(std::make_shared<node>(node{
         .isLeafNode = false, .triStart = 0, .triEnd = int(_triangles.size())}));
   };
 
 private:
-  std::unique_ptr<node> split(std::unique_ptr<node> parentNode) {
+  std::shared_ptr<node> split(std::shared_ptr<node> parentNode) {
     if (parentNode->triEnd - parentNode->triStart < 10) {
       parentNode->isLeafNode = true;
       return parentNode;
@@ -81,12 +83,12 @@ private:
       maxZ = std::max({maxZ, t.p1.z, t.p2.z, t.p3.z});
     }
 
-    auto left_node = std::make_unique<node>(
+    auto left_node = std::make_shared<node>(
         node{.isLeafNode = false,
              .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
              .triStart = parentNode->triStart,
              .triEnd = partitionPoint});
-    parentNode->left = split(std::move(left_node));
+    parentNode->left = split(left_node);
 
     minX = infinity, minY = infinity, minZ = infinity;
     maxX = -infinity, maxY = -infinity, maxZ = -infinity;
@@ -102,12 +104,28 @@ private:
       maxY = std::max({maxY, t.p1.y, t.p2.y, t.p3.y});
       maxZ = std::max({maxZ, t.p1.z, t.p2.z, t.p3.z});
     }
-    auto right_node = std::make_unique<node>(
+    auto right_node = std::make_shared<node>(
         node{.isLeafNode = false,
              .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
              .triStart = partitionPoint,
              .triEnd = parentNode->triEnd});
-    parentNode->right = split(std::move(right_node));
+    parentNode->right = split(right_node);
     return parentNode;
   }
 };
+
+inline int toArray(const std::shared_ptr<node> n, std::vector<arrayNode> &ans) {
+  arrayNode an = arrayNode{.min = n->bbox.minValues(),
+                           .isLeafNode = n->isLeafNode,
+                           .max = n->bbox.maxValues(),
+                           .triStart = n->triStart,
+                           .triEnd = n->triEnd};
+  ans.push_back(an);
+  int ind = ans.size() - 1;
+  if (an.isLeafNode) {
+    return ind;
+  }
+  ans[ind].leftInd = toArray(n->left, ans);
+  ans[ind].rightInd = toArray(n->right, ans);
+  return ind;
+}

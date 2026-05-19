@@ -86,6 +86,12 @@ void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
   }
 }
 
+void mouseScrollCallback(GLFWwindow *window, double xOffset, double yOffset) {
+  if (Scene::current) {
+    Scene::current->onMouseWheel(xOffset, yOffset);
+  }
+}
+
 int main() {
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -115,6 +121,7 @@ int main() {
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetCursorPosCallback(window, mouseCallback);
   glfwSetMouseButtonCallback(window, mouseButtonCallback);
+  glfwSetScrollCallback(window, mouseScrollCallback);
 
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);

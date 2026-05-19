@@ -112,6 +112,12 @@ public:
     initCamera();
   }
 
+  void updateVfovBy(float v) {
+    vfov += v;
+    vfov = glm::clamp(vfov, 5.0f, 180.0f);
+    initCamera();
+  }
+
   void handleWindowSizeChange(int window_width, int window_height) {
     if (window_width == width && window_height == height) {
       return;

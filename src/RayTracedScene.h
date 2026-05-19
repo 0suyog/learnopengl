@@ -94,6 +94,11 @@ public:
   void onMouseMove(float xPos, float yPos, float dx, float dy) override {
     cam.rotate(dx, dy);
   }
+
+  void onMouseWheel(float Xoffset, float yOffset) override {
+    cam.updateVfovBy(-yOffset);
+  }
+
   // for debugging
   // void onMouseClick(int button, int action, int mods) override {
   //   std::cerr << "Camera Position: " << cam.position.x << cam.position.y

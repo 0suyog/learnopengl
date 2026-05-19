@@ -15,6 +15,7 @@ public:
   virtual void onKeyPress(int buttons, int action, int mods) {};
   virtual void onWindowResize(GLFWwindow *window, int width, int height) {};
   virtual void onMouseMove(float xPos, float yPos, float dx, float dy) {};
+  virtual void onMouseWheel(float Xoffset, float yOffset) {};
 
   virtual void draw() = 0;
 

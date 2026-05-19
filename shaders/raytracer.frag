@@ -435,17 +435,17 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, ReceivedTriangle[MAX_TRIANGLE
 	 if(hitAnything){
 		closest = h.t;
 	 }
-	 // if(hitQuads(quads,r,h,closest)){
-	 // hitAnything=true;
-	 // }
+	 if(hitQuads(quads,r,h,closest)){
+	 hitAnything=true;
+	 }
 	 if (hitAnything){
 		closest = h.t;
 	 }
 	 // return hitTriangles(triangles,r,h,closest);
-	 if (hitTriangles(triangles,r,h,closest)){
-		// return h.normal;
-	 hitAnything = true;
-	 }
+	 // if (hitTriangles(triangles,r,h,closest)){
+	 // // return h.normal;
+	 // hitAnything = true;
+	 // }
 	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
 		return vec3(0.0,0.0,0.0);
@@ -485,7 +485,7 @@ vec3 multiSampleLoop(Sphere[3] world,Quad[7] q, ReceivedTriangle[MAX_TRIANGLE] t
 	 vec3 offset = randomSample.x*delta_u + randomSample.y*delta_v;
 	 vec3 rayDir = normalize(( fragCoord-origin )+offset);
 	 Ray r = createRay(origin,rayDir);
-	 color+= rayColor(r,world,q,tri,10);
+	 color+= rayColor(r,world,q,tri,4);
   }
   color= color/samplesPerPixel;
   return color;

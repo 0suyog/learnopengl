@@ -39,7 +39,7 @@ public:
         glm::vec3(cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
                   sin(glm::radians(pitch)),
                   sin(glm::radians(yaw)) * cos(glm::radians(pitch))));
-    u = glm::cross(w, vup);
+    u = glm::normalize(glm::cross(w, vup));
     v = glm::cross(w, u);
     float viewPortHeight = 2.0 * tan(glm::radians(vfov / 2)) * focal_length;
     float viewPortWidth = aspectRatio * viewPortHeight;

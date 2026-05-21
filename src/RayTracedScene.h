@@ -141,10 +141,10 @@ public:
 
     std::vector<ShaderNode> shaderNodes;
     toArray(bvh(triangles).head, shaderNodes);
+    // std::cerr << float(false);
     for (int i = 0; i < shaderNodes.size(); i++) {
-      if (shaderNodes[i].minmax[6] > 0.5) {
-        std::cerr << i << "\n";
-      }
+      std::cerr << "index: " << i << "value: " << shaderNodes[i].minmax[6]
+                << "\n";
     }
     // ssbo for bvh
     glGenBuffers(1, &bvhSSbo);

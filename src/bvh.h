@@ -162,7 +162,7 @@ inline int toArray(const std::shared_ptr<node> n,
   sn.indices = {n->triStart, n->triEnd, -1, -1};
   shaderNodes.push_back(sn);
   int ind = shaderNodes.size() - 1;
-
+  std::cerr << ind << " " << n->isLeafNode << "\n";
   if (n->isLeafNode)
     return ind;
 

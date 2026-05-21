@@ -1,5 +1,5 @@
 #version 460 core
-#define MAX_STACK_SIZE 64
+#define MAX_STACK_SIZE 200
 in vec3 FragPosition;
 out vec4 FragColor;
 uniform float time;
@@ -141,10 +141,10 @@ BvhNode shaderNodeToBvhNode(in ShaderNode node)
   bn.isLeafNode = (node.minmax[6] > 0.5);
   bn.isLeft = (node.minmax[7]>0.5);
 
-  bn.leftInd = node.indices[0];
-  bn.rightInd = node.indices[1];
-  bn.triStart = node.indices[2];
-  bn.triEnd = node.indices[3];
+  bn.triStart = node.indices[0];
+  bn.triEnd = node.indices[1];
+  bn.leftInd = node.indices[2];
+  bn.rightInd = node.indices[3];
 
   return bn;
 }
@@ -431,48 +431,47 @@ bool hitTriangles(int triStart, int triEnd,Ray r,inout HitInfo h, float closest)
   return hitAnything;
 }
 
-vec3 hit(Ray r, inout HitInfo ht,float closestHit){
+bool hit(Ray r, inout HitInfo ht,float closestHit){
   int bvhStack[MAX_STACK_SIZE];
   int pointer= 0;
   bool hitAnything=false;
-  bvhStack[pointer++]=0;
+  bvhStack[pointer]=0;
   // return true;
-  int count = 0;
+  // int count = 0;
 
-  while(pointer>0){
-	 count ++;
-	 if (count > 100){
-	 return vec3(1.0);
-	 // return false;
-	 }
-	 if (bvhStack[pointer]==2){
-return vec3(1, 0.302, 0.965);
-	 }
+  while(pointer>=0){
+	 // count ++;
+	 // if (pointer == 2 && shaderNodeToBvhNode(bvh[bvhStack[pointer]]).isLeafNode){
+	 // }
+	 // if (count > 100){
+	 // return vec3(1.0);
+	 // // return false;
+	 // }
 	 BvhNode bn = shaderNodeToBvhNode(bvh[bvhStack[pointer--]]);
 	 if(hitBoundingBox(bn.min,bn.max, r)){
 		if (bn.isLeafNode){
 	 // return vec3(1.0,0.0,1.0);
 		  if (hitTriangles(bn.triStart,bn.triEnd,r,ht,closestHit)){
+// return vec3(1, 0.302, 0.965);
 			 closestHit = ht.t;
 			 hitAnything = true;
-		  }}
-		else{
-		  if (bn.leftInd !=-1){
-			 bvhStack[++pointer]=bn.rightInd;
-		  } if(bn.rightInd != -1){
-			 bvhStack[++pointer] = bn.leftInd;
 		  }
 		}
-	 }else{
-return vec3(1, 0.302, 0.965);
+		else{
+		  if (bn.leftInd !=-1){
+			 bvhStack[++pointer]=bn.leftInd;
+		  } if(bn.rightInd != -1){
+			 bvhStack[++pointer] = bn.rightInd;
+		  }
+		}
 	 }
   }
-  if (hitAnything){
-  return vec3(1.0,1.0,0.0);
-  } else{
-	 return vec3(1.0,1.0,0.0);
-  }
-  // return hitAnything;
+  // if (hitAnything){
+  // return vec3(1.0,1.0,0.0);
+  // } else{
+  // return vec3(1.0,0.0,0.0);
+  // }
+  return hitAnything;
 }
 
 bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
@@ -641,10 +640,10 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 		closest = h.t;
 	 }
 	 // return hitTriangles(triangles,r,h,closest);
-	 return hit(r,h,closest);
-	 // if (hit(r,h,closest)){
-	 // hitAnything =true;
-	 // }
+	 // return hit(r,h,closest);
+	 if (hit(r,h,closest)){
+	 hitAnything =true;
+	 }
 	 // if (hitTriangles(0,triangleCount,r,h,closest)){
 	 // // return h.normal;
 	 // hitAnything = true;
@@ -879,10 +878,25 @@ void main() {
   vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
-  //
+
   // if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
   // FragColor = vec4(0.0, 1, 0.0,1.0);
   // }
   // triangles.length();
+  // for (int i =0; i<7;i++){
+  // if (bvh[i].minmax[6]>0.5 && i == 1){
+  // FragColor = vec4(1.0,0.0,0.0,1.0);
+  // return;
+  // }
+  // else{
+  // FragColor = vec4(0.0,0.0,1.0, 1.0);
+  // }}
+  // if (bvh.length()==7){
+  // FragColor = vec4(1.0,0.0,0.0,1.0);
+  // }
+  // else{
+  // FragColor = vec4(0.0,0.0,1.0, 1.0);
+  // }
   // FragColor = vec4(float( bvh.length() )/10,0.0,0.0,1.0);
+  
 }

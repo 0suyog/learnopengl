@@ -1,4 +1,5 @@
 #version 460 core
+#define MAX_STACK_SIZE 64
 in vec3 FragPosition;
 out vec4 FragColor;
 uniform float time;
@@ -13,6 +14,7 @@ uniform vec3 delta_v;
 uniform vec3 firstPixelLocation;
 uniform sampler2D prevTexture;
 uniform uint frame;
+uniform bool useBvh;
 
 const uint LAMBERTIAN = 1u;
 const uint METAL = 2u;
@@ -47,59 +49,106 @@ struct ShaderTriangle{
   float uvs[8];
 };
 
+struct BvhNode{
+  vec3 min;
+  bool isLeafNode;
+  vec3 max;
+  bool isLeft;
+  int leftInd;
+  int rightInd;
+  int triStart;
+  int triEnd;
+};
+
+struct ShaderNode{
+  float minmax[8];
+  int indices[4];
+};
+
 layout(std430, binding=1) buffer TrianglesLayout{
   ShaderTriangle triangles[];
 };
+layout(std430, binding=2) buffer BvhLayout{
+  ShaderNode bvh[];
+};
 
 ReceivedTriangle shaderTriangleToTriangle(
-    in ShaderTriangle trig
+  in ShaderTriangle trig
 ){
-    ReceivedTriangle rt;
+  ReceivedTriangle rt;
 
-    rt.p1 = vec3(
-        trig.triangles[0],
-        trig.triangles[1],
-        trig.triangles[2]
-    );
+  rt.p1 = vec3(
+	 trig.triangles[0],
+	 trig.triangles[1],
+	 trig.triangles[2]
+  );
 
-    rt.p2 = vec3(
-        trig.triangles[3],
-        trig.triangles[4],
-        trig.triangles[5]
-    );
+  rt.p2 = vec3(
+	 trig.triangles[3],
+	 trig.triangles[4],
+	 trig.triangles[5]
+  );
 
-    rt.p3 = vec3(
-        trig.triangles[6],
-        trig.triangles[7],
-        trig.triangles[8]
-    );
+  rt.p3 = vec3(
+	 trig.triangles[6],
+	 trig.triangles[7],
+	 trig.triangles[8]
+  );
 
-    rt.n = vec3(
-        trig.triangles[9],
-        trig.triangles[10],
-        trig.triangles[11]
-    );
+  rt.n = vec3(
+	 trig.triangles[9],
+	 trig.triangles[10],
+	 trig.triangles[11]
+  );
 
-    rt.uv1 = vec2(
-        trig.uvs[0],
-        trig.uvs[1]
-    );
+  rt.uv1 = vec2(
+	 trig.uvs[0],
+	 trig.uvs[1]
+  );
 
-    rt.uv2 = vec2(
-        trig.uvs[2],
-        trig.uvs[3]
-    );
+  rt.uv2 = vec2(
+	 trig.uvs[2],
+	 trig.uvs[3]
+  );
 
-    rt.uv3 = vec2(
-        trig.uvs[4],
-        trig.uvs[5]
-    );
+  rt.uv3 = vec2(
+	 trig.uvs[4],
+	 trig.uvs[5]
+  );
 
-    rt.D = trig.uvs[6];
-    rt.oneSided = trig.uvs[7] > 0.5;
+  rt.D = trig.uvs[6];
+  rt.oneSided = trig.uvs[7] > 0.5;
 
-    return rt;
+  return rt;
 }
+
+BvhNode shaderNodeToBvhNode(in ShaderNode node)
+{
+  BvhNode bn;
+
+  bn.min = vec3(
+	 node.minmax[0],
+	 node.minmax[1],
+	 node.minmax[2]
+  );
+
+  bn.max = vec3(
+	 node.minmax[3],
+	 node.minmax[4],
+	 node.minmax[5]
+  );
+
+  bn.isLeafNode = (node.minmax[6] > 0.5);
+  bn.isLeft = (node.minmax[7]>0.5);
+
+  bn.leftInd = node.indices[0];
+  bn.rightInd = node.indices[1];
+  bn.triStart = node.indices[2];
+  bn.triEnd = node.indices[3];
+
+  return bn;
+}
+
 
 // uniform ReceivedTriangle triangles[MAX_TRIANGLE] ;
 
@@ -237,7 +286,7 @@ bool isFrontFace(vec3 incomingDir,vec3 normal){
 //     return fract(p.x * p.y);
 // }
 float rand(vec2 p) {
-    return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
+  return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
 }
 
 vec3 randVec3(vec2 seed){
@@ -259,7 +308,7 @@ vec3 randVec3InSphere(vec2 seed){
 		return randomVec;
 	 }
 	 if (count > 10){
-	  return vec3(1.0, 0.0, 0.0); 
+		return vec3(1.0, 0.0, 0.0); 
 	 }
 	 seed+=randomVec.xy;
   }
@@ -273,73 +322,58 @@ vec3 randVec3InHemisphere(vec2 seed, vec3 normal){
   return randomVec;
 }
 
-bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
-  vec3 direction = normalize(r.direction);
-  float a = 1;
-  vec3 co = sphere.origin - r.origin;
-  float h = dot(co, direction);
-  float c = dot(co, co) - (sphere.radius * sphere.radius);
-  float discriminant = (h * h) - (a * c);
-  if (discriminant < 0) {
-	 return false;
+bool hitBoundingBox(vec3 minPos, vec3 maxPos, Ray r)
+{
+  float xo = r.origin.x;
+  float yo = r.origin.y;
+  float zo = r.origin.z;
+
+  float xd = r.direction.x;
+  float yd = r.direction.y;
+  float zd = r.direction.z;
+
+  float tminx = (minPos.x - xo) / xd;
+  float tmaxx = (maxPos.x - xo) / xd;
+
+  float tminy = (minPos.y - yo) / yd;
+  float tmaxy = (maxPos.y - yo) / yd;
+
+  float tminz = (minPos.z - zo) / zd;
+  float tmaxz = (maxPos.z - zo) / zd;
+
+
+  // Handle negative directions
+  if (tminx > tmaxx) {
+	 float temp = tminx;
+	 tminx = tmaxx;
+	 tmaxx = temp;
   }
-  float discriminantSqrt = sqrt(discriminant);
-  float t = (h - discriminantSqrt) / a;
-  if (t<0.001||t>closestHit){
-	 if (discriminant == 0) {
-		return false;
-	 }
-	 t=(h+discriminantSqrt)/a;
-	 if (t<0.001||t>closestHit){
-		return false;
-	 }
+
+  if (tminy > tmaxy) {
+	 float temp = tminy;
+	 tminy = tmaxy;
+	 tmaxy = temp;
   }
-  vec3 p = rayAt(r, t);
-  vec3 n = sphereNormalAt(sphere, p);
-  n = isFrontFace(r.direction,n) ? n: -n;
-  ht = newHitInfo(p, n, t, sphere.mat);
-  return true;
+
+  if (tminz > tmaxz) {
+	 float temp = tminz;
+	 tminz = tmaxz;
+	 tmaxz = temp;
+  }
+
+
+  float tmin = max(tminz, max(tminx, tminy));
+  float tmax = min(tmaxz, min(tmaxx, tmaxy));
+
+  return tmin < tmax;
 }
 
-bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
-  float denom = dot(q.n,r.direction);
-  if (abs( denom ) <= 1e-8){
-		return false;
-  }
-  float np = dot(q.n,r.origin);
-  float t = (q.D-np)/denom;
-  if (t<0.01 || t>=closestHit){
-	 return false;
-  }
-  vec3 p = rayAt(r,t);
-  vec3 relativeP = p-q.bottomLeft;
-  // checking if the hitpoint lies in the quad
-  float a = dot(q.u,q.u);
-  float b = dot(q.u,q.v);
-  float c = dot(relativeP,q.u);
-  float d = dot(q.v,q.v);
-  float e = dot(relativeP,q.v);
-  float beta = (( a*e )-(b*c))/((a*d)-(b*b));
-  float alpha = (c-(b*beta))/a;
-  if (beta >1 || beta <0 || alpha < 0 || alpha >1){
-	 return false;
-  }
-  bool frontFace=isFrontFace(r.direction,q.n);
-  if (q.oneSided){
-	 if (!frontFace){
-		return false;
-	 }
-  }
-  vec3 n = isFrontFace(r.direction,q.n)?q.n:-q.n;
-  ht = newHitInfo(p, n, t, q.mat);
-  return true;
-}
 
 bool hitTriangle(ReceivedTriangle tri, Ray r, inout HitInfo ht, float closest ){
   float denom = dot(tri.n,r.direction);
   if (abs( denom ) <= 1e-8){
 	 // return vec3(1.0,0.0,0.0); // red for parallel
-		return false;
+	 return false;
   }
   float np = dot(tri.n,r.origin);
   float t = (tri.D-np)/denom;
@@ -381,6 +415,129 @@ bool hitTriangle(ReceivedTriangle tri, Ray r, inout HitInfo ht, float closest ){
   return true;
 }
 
+bool hitTriangles(int triStart, int triEnd,Ray r,inout HitInfo h, float closest){
+  HitInfo tempHit;
+  float closestSoFar=closest;
+  bool hitAnything=false;
+  for (int i=triStart ;i<triEnd ;i++){
+	 if (hitTriangle(shaderTriangleToTriangle( triangles[i] ),r,tempHit, closestSoFar)){
+		hitAnything=true;
+		if (tempHit.t<closestSoFar){
+		  closestSoFar = tempHit.t;
+		  h=tempHit;
+		}
+	 }
+  }
+  return hitAnything;
+}
+
+vec3 hit(Ray r, inout HitInfo ht,float closestHit){
+  int bvhStack[MAX_STACK_SIZE];
+  int pointer= 0;
+  bool hitAnything=false;
+  bvhStack[pointer++]=0;
+  // return true;
+  int count = 0;
+
+  while(pointer>0){
+	 count ++;
+	 if (count > 100){
+	 return vec3(1.0);
+	 // return false;
+	 }
+	 if (bvhStack[pointer]==2){
+return vec3(1, 0.302, 0.965);
+	 }
+	 BvhNode bn = shaderNodeToBvhNode(bvh[bvhStack[pointer--]]);
+	 if(hitBoundingBox(bn.min,bn.max, r)){
+		if (bn.isLeafNode){
+	 // return vec3(1.0,0.0,1.0);
+		  if (hitTriangles(bn.triStart,bn.triEnd,r,ht,closestHit)){
+			 closestHit = ht.t;
+			 hitAnything = true;
+		  }}
+		else{
+		  if (bn.leftInd !=-1){
+			 bvhStack[++pointer]=bn.rightInd;
+		  } if(bn.rightInd != -1){
+			 bvhStack[++pointer] = bn.leftInd;
+		  }
+		}
+	 }else{
+return vec3(1, 0.302, 0.965);
+	 }
+  }
+  if (hitAnything){
+  return vec3(1.0,1.0,0.0);
+  } else{
+	 return vec3(1.0,1.0,0.0);
+  }
+  // return hitAnything;
+}
+
+bool hitSphere(Sphere sphere, Ray r, out HitInfo ht, float closestHit) {
+  vec3 direction = normalize(r.direction);
+  float a = 1;
+  vec3 co = sphere.origin - r.origin;
+  float h = dot(co, direction);
+  float c = dot(co, co) - (sphere.radius * sphere.radius);
+  float discriminant = (h * h) - (a * c);
+  if (discriminant < 0) {
+	 return false;
+  }
+  float discriminantSqrt = sqrt(discriminant);
+  float t = (h - discriminantSqrt) / a;
+  if (t<0.001||t>closestHit){
+	 if (discriminant == 0) {
+		return false;
+	 }
+	 t=(h+discriminantSqrt)/a;
+	 if (t<0.001||t>closestHit){
+		return false;
+	 }
+  }
+  vec3 p = rayAt(r, t);
+  vec3 n = sphereNormalAt(sphere, p);
+  n = isFrontFace(r.direction,n) ? n: -n;
+  ht = newHitInfo(p, n, t, sphere.mat);
+  return true;
+}
+
+bool hitQuad(Quad q, Ray r, inout HitInfo ht, float closestHit){
+  float denom = dot(q.n,r.direction);
+  if (abs( denom ) <= 1e-8){
+	 return false;
+  }
+  float np = dot(q.n,r.origin);
+  float t = (q.D-np)/denom;
+  if (t<0.01 || t>=closestHit){
+	 return false;
+  }
+  vec3 p = rayAt(r,t);
+  vec3 relativeP = p-q.bottomLeft;
+  // checking if the hitpoint lies in the quad
+  float a = dot(q.u,q.u);
+  float b = dot(q.u,q.v);
+  float c = dot(relativeP,q.u);
+  float d = dot(q.v,q.v);
+  float e = dot(relativeP,q.v);
+  float beta = (( a*e )-(b*c))/((a*d)-(b*b));
+  float alpha = (c-(b*beta))/a;
+  if (beta >1 || beta <0 || alpha < 0 || alpha >1){
+	 return false;
+  }
+  bool frontFace=isFrontFace(r.direction,q.n);
+  if (q.oneSided){
+	 if (!frontFace){
+		return false;
+	 }
+  }
+  vec3 n = isFrontFace(r.direction,q.n)?q.n:-q.n;
+  ht = newHitInfo(p, n, t, q.mat);
+  return true;
+}
+
+
 bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h, float closest){
   HitInfo tempHit;
   float closestSoFar=closest;
@@ -389,7 +546,7 @@ bool hitSpheres( Sphere[3] world,Ray r,inout HitInfo h, float closest){
 	 if (hitSphere(world[i],r,tempHit, closestSoFar)){
 		hitAnything=true;
 		if (tempHit.t<closestSoFar){
-			 closestSoFar = tempHit.t;
+		  closestSoFar = tempHit.t;
 		  h=tempHit;
 		}
 	 }
@@ -405,7 +562,7 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
 	 if (hitQuad(world[i],r,tempHit, closestSoFar)){
 		hitAnything=true;
 		if (tempHit.t<closestSoFar){
-			 closestSoFar = tempHit.t;
+		  closestSoFar = tempHit.t;
 		  h=tempHit;
 		}
 	 }
@@ -413,31 +570,16 @@ bool hitQuads(Quad[7] world,Ray r,inout HitInfo h, float closest){
   return hitAnything;
 }
 
-bool hitTriangles(Ray r,inout HitInfo h, float closest){
-  HitInfo tempHit;
-  float closestSoFar=closest;
-  bool hitAnything=false;
-  for (int i=0;i<triangleCount;i++){
-	 if (hitTriangle(shaderTriangleToTriangle( triangles[i] ),r,tempHit, closestSoFar)){
-	 hitAnything=true;
-	 if (tempHit.t<closestSoFar){
-	 	 closestSoFar = tempHit.t;
-	   h=tempHit;
-	 }
-	 }
-  }
-  return hitAnything;
-}
 
 vec3 lambertianReflection(vec3 normal,vec2 seed){
-	 vec3 randVec = randVec3InHemisphere(seed,normal);
+  vec3 randVec = randVec3InHemisphere(seed,normal);
   return normalize(randVec);
 }
 
 
 vec3 reflect(vec3 incidentDir,vec3 normal){
 
- return incidentDir-( 2.0*( dot(incidentDir,normal)*normal ) );
+  return incidentDir-( 2.0*( dot(incidentDir,normal)*normal ) );
 }
 
 bool scatter(in Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
@@ -469,7 +611,7 @@ vec3 emit(in Ray r_in,in HitInfo h){
 		return h.mat.emission;
 	 }
 	 default:{
-		 return vec3(0.0,0.0,0.0);
+		return vec3(0.0,0.0,0.0);
 	 }
   }
 }
@@ -486,23 +628,27 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 	 bool hitAnything=false;
 	 HitInfo h;
 	 if (hitSpheres(world,r,h,1.0/0.0)){
-	  hitAnything=true; 
+		hitAnything=true; 
 	 }
 	 float closest = 1.0/0.0;
 	 if(hitAnything){
 		closest = h.t;
 	 }
-	 // if(hitQuads(quads,r,h,closest)){
-	 // hitAnything=true;
-	 // }
+	 if(hitQuads(quads,r,h,closest)){
+		hitAnything=true;
+	 }
 	 if (hitAnything){
 		closest = h.t;
 	 }
 	 // return hitTriangles(triangles,r,h,closest);
-	 if (hitTriangles(r,h,closest)){
-	 // return h.normal;
-	 hitAnything = true;
-	 }
+	 return hit(r,h,closest);
+	 // if (hit(r,h,closest)){
+	 // hitAnything =true;
+	 // }
+	 // if (hitTriangles(0,triangleCount,r,h,closest)){
+	 // // return h.normal;
+	 // hitAnything = true;
+	 // }
 	 // return vec3(float(hitAnything));
 	 if(!hitAnything){
 		return vec3(0.0,0.0,0.0);
@@ -733,10 +879,10 @@ void main() {
   vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
-
-  if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
-  FragColor = vec4(0.0, 1, 0.0,1.0);
-  }
+  //
+  // if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
+  // FragColor = vec4(0.0, 1, 0.0,1.0);
+  // }
   // triangles.length();
-  // FragColor = vec4(triangles.length(),0.0,0.0,1.0);
+  // FragColor = vec4(float( bvh.length() )/10,0.0,0.0,1.0);
 }

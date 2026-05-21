@@ -4,6 +4,7 @@
 #include "shader.h"
 #include <array>
 #include <cstddef>
+#include <iostream>
 #include <string>
 #include <vector>
 struct Vertex {
@@ -23,6 +24,7 @@ struct Triangle {
 
   // if 1 then left if 2 then right for bvh
   int leftOrRight(int axis, float min, float mid, float max) {
+    // std::cerr << centroid()[axis] << " " << mid << "\n";
     if (centroid()[axis] < mid) {
       return 1;
     }

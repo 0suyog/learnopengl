@@ -1,13 +1,16 @@
 #pragma once
 #include "boundingbox.h"
+#include "glm/common.hpp"
 #include "interval.h"
 #include "mesh.h"
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <utility>
 #include <vector>
 struct node {
   bool isLeafNode;
+  bool isLeft;
   std::shared_ptr<node> left;
   std::shared_ptr<node> right;
   boundingBox bbox;
@@ -27,7 +30,7 @@ struct arrayNode {
 
 struct ShaderNode {
   // first 6 store minx, miny, minz, maxx and so on and second last is to see if
-  // is leaf node and lastis for padding
+  // is leaf node and lastis bool isLeft;
   std::array<float, 8> minmax;
   // triStart,triEnd, left ind, right ind
   std::array<int, 4> indices;
@@ -42,8 +45,21 @@ public:
 
   bvh(std::vector<Triangle> _triangles) {
     triangles = _triangles;
-    head = split(std::make_shared<node>(node{
-        .isLeafNode = false, .triStart = 0, .triEnd = int(_triangles.size())}));
+    float minX, minY, minZ, maxX, maxY, maxZ;
+    for (const auto &trig : triangles) {
+      minX = glm::min(trig.p1.x, glm::min(trig.p2.x, trig.p3.x));
+      minY = glm::min(trig.p1.y, glm::min(trig.p2.y, trig.p3.y));
+      minZ = glm::min(trig.p1.z, glm::min(trig.p2.z, trig.p3.z));
+      maxX = glm::max(trig.p1.x, glm::max(trig.p2.x, trig.p3.x));
+      maxY = glm::max(trig.p1.y, glm::max(trig.p2.y, trig.p3.y));
+      maxZ = glm::max(trig.p1.z, glm::max(trig.p2.z, trig.p3.z));
+    }
+    head = split(std::make_shared<node>(
+        node{.isLeafNode = false,
+             .isLeft = false,
+             .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
+             .triStart = 0,
+             .triEnd = int(_triangles.size())}));
   };
 
 private:
@@ -56,14 +72,13 @@ private:
     float min, max, mid;
     parentNode->bbox.getAxisValue(axis, min, max, mid);
     bool partitioned = false;
-    int partitionPoint = parentNode->triStart + parentNode->triEnd / 2;
+    int partitionPoint = (parentNode->triStart + parentNode->triEnd) / 2;
     int leftSide = parentNode->triStart;
-    int rightSide = parentNode->triEnd;
-
+    int rightSide = parentNode->triEnd - 1;
     while (leftSide <= rightSide) {
       if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 1) {
         leftSide++;
-      } else if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 2) {
+      } else if (triangles[rightSide].leftOrRight(axis, min, mid, max) == 2) {
         rightSide--;
       } else {
         std::swap(triangles[leftSide], triangles[rightSide]);
@@ -76,6 +91,8 @@ private:
 
     if (partitionPoint == parentNode->triStart ||
         partitionPoint == parentNode->triEnd) {
+      // std::cerr << partitionPoint << " " << parentNode->triStart << " "
+      //           << parentNode->triEnd;
       parentNode->isLeafNode = true;
       return parentNode;
     }
@@ -96,6 +113,7 @@ private:
 
     auto left_node = std::make_shared<node>(
         node{.isLeafNode = false,
+             .isLeft = true,
              .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
              .triStart = parentNode->triStart,
              .triEnd = partitionPoint});
@@ -117,6 +135,7 @@ private:
     }
     auto right_node = std::make_shared<node>(
         node{.isLeafNode = false,
+             .isLeft = false,
              .bbox = boundingBox(maxX, maxY, maxZ, minX, minY, minZ),
              .triStart = partitionPoint,
              .triEnd = parentNode->triEnd});
@@ -130,22 +149,35 @@ inline int toArray(const std::shared_ptr<node> n,
   ShaderNode sn;
   auto bboxMax = n->bbox.maxValues();
   auto bboxMin = n->bbox.minValues();
-  sn.minmax = {bboxMin.x,
-               bboxMin.y,
-               bboxMin.z,
-               bboxMax.x,
-               bboxMax.y,
-               bboxMax.z,
-               float(n->isLeafNode),
-               0.0};
-  sn.indices = {n->triStart, n->triEnd};
-
+  sn.minmax = {
+      bboxMin.x,
+      bboxMin.y,
+      bboxMin.z,
+      bboxMax.x,
+      bboxMax.y,
+      bboxMax.z,
+      float(n->isLeafNode),
+      float(n->isLeft),
+  };
+  sn.indices = {n->triStart, n->triEnd, -1, -1};
   shaderNodes.push_back(sn);
   int ind = shaderNodes.size() - 1;
-  if (n->isLeafNode) {
+
+  if (n->isLeafNode)
     return ind;
-  }
-  shaderNodes[ind].indices[2] = toArray(n->left, shaderNodes);
-  shaderNodes[ind].indices[3] = toArray(n->right, shaderNodes);
+
+  int leftInd = -1;
+  int rightInd = -1;
+
+  if (n->left != nullptr)
+    leftInd = toArray(n->left, shaderNodes);
+  if (n->right != nullptr)
+    rightInd = toArray(n->right, shaderNodes);
+
+  // Vector may have reallocated during recursion — index fresh, don't cache
+  // pointer/ref
+  shaderNodes[ind].indices[2] = leftInd;
+  shaderNodes[ind].indices[3] = rightInd;
+
   return ind;
 }

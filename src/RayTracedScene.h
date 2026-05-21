@@ -138,7 +138,21 @@ public:
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(shaderTriangles),
                  shaderTriangles, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, trianglesSsbo);
-    // b = bvh(triangles);
+
+    std::vector<ShaderNode> shaderNodes;
+    toArray(bvh(triangles).head, shaderNodes);
+    for (int i = 0; i < shaderNodes.size(); i++) {
+      if (shaderNodes[i].minmax[6] > 0.5) {
+        std::cerr << i << "\n";
+      }
+    }
+    // ssbo for bvh
+    glGenBuffers(1, &bvhSSbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, bvhSSbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+                 sizeof(ShaderNode) * shaderNodes.size(), shaderNodes.data(),
+                 GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bvhSSbo);
   }
 
 private:
@@ -151,8 +165,8 @@ private:
 
   unsigned int canvasIndices[6] = {0, 1, 2, 3, 0, 2};
 
-  unsigned int raytracerVAO, raytracerEBO, raytracerVBO, raytracerFBO,
-      rayTracerTexture, raytracerRBO, trianglesSsbo;
+  GLuint raytracerVAO, raytracerEBO, raytracerVBO, raytracerFBO,
+      rayTracerTexture, raytracerRBO, trianglesSsbo, bvhSSbo;
 
   Shader raytracerShader =
       Shader("../shaders/raytracer.vert", "../shaders/raytracer.frag");
@@ -168,5 +182,4 @@ private:
 
   std::vector<Triangle> triangles;
   std::vector<arrayNode> nodes;
-  bvh b = bvh();
 };

@@ -70,9 +70,9 @@ public:
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     cam.initCamera();
-    cam.position = glm::vec3(555.0f / 2, 555.0f / 2, 555.0f);
+    cam.position = glm::vec3(9.36, 33.60, 516.613);
     cam.yaw = 90.0f;
-    cam.pitch = 0.0f;
+    cam.pitch = .0f;
     cam.vfov = 60;
     cam.camSensitivity = 0.1f;
 
@@ -83,32 +83,44 @@ public:
         GLFW_PRESS) {
       cam.moveFast = true;
     }
+    if (glfwGetKey(globalWindowState.window, GLFW_KEY_R) == GLFW_PRESS) {
+      stopInput = !stopInput;
+    }
     raytracerShader.use();
-    cam.move(globalWindowState.window, deltaTime);
-    cam.update();
+    if (!stopInput) {
+      cam.move(globalWindowState.window, deltaTime);
+      cam.update();
+    }
     float time = glfwGetTime();
     raytracerShader.setFloat("time", time);
     raytracerShader.setInt("uSamplesPerPixel", samplesPerPixel);
   }
 
   void onWindowResize(GLFWwindow *window, int width, int height) override {
-    cam.handleWindowSizeChange(width, height);
+    if (!stopInput) {
+      cam.handleWindowSizeChange(width, height);
+    }
   }
 
   void onMouseMove(float xPos, float yPos, float dx, float dy) override {
-    cam.rotate(dx, dy);
+    if (!stopInput) {
+      cam.rotate(dx, dy);
+    }
   }
 
   void onMouseWheel(float Xoffset, float yOffset) override {
-    cam.updateVfovBy(-yOffset);
+    if (!stopInput) {
+      cam.updateVfovBy(-yOffset);
+    }
   }
 
   // for debugging
-  // void onMouseClick(int button, int action, int mods) override {
-  //   std::cerr << "Camera Position: " << cam.position.x << cam.position.y
-  //             << cam.position.z << "\n";
-  //   std::cerr << "Camera Vfov:" << cam.vfov << "\n";
-  // }
+  void onMouseClick(int button, int action, int mods) override {
+    std::cerr << "Camera Position: " << cam.position.x << " " << cam.position.y
+              << " " << cam.position.z << "\n";
+    std::cerr << "pich: " << cam.pitch << "yaw: " << cam.yaw << "\n";
+    std::cerr << "Camera Vfov:" << cam.vfov << "\n";
+  }
 
   void draw() override {
     glBindFramebuffer(GL_FRAMEBUFFER, raytracerFBO);
@@ -125,7 +137,8 @@ public:
   void loadModels() {
     // auto pawn = Model("../models/pawn/LOW_POLY_piece_Pawn.obj");
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::scale(model, glm::vec3(100.0f));
+    model = glm::scale(model, glm::vec3(70.0f));
+    model = glm::translate(model, glm::vec3(0.0, -2 + 0.0, 0.0));
     auto pawnTrigs = pawn.allTriangles(model);
     triangles.insert(triangles.end(), pawnTrigs.begin(), pawnTrigs.end());
     // ssbo for triangles
@@ -142,10 +155,18 @@ public:
     std::vector<ShaderNode> shaderNodes;
     toArray(bvh(triangles).head, shaderNodes);
     // std::cerr << float(false);
-    for (int i = 0; i < shaderNodes.size(); i++) {
-      std::cerr << "index: " << i << "value: " << shaderNodes[i].minmax[6]
-                << "\n";
-    }
+    // for (int i = 0; i < shaderNodes.size(); i++) {
+    //   const auto &n = shaderNodes[i];
+    //   std::cerr << "index: " << i << " minX: " << n.minmax[0]
+    //             << " minY: " << n.minmax[1] << " minZ: " << n.minmax[2]
+    //             << " maxX: " << n.minmax[3] << " maxY: " << n.minmax[4]
+    //             << " maxZ: " << n.minmax[5] << " isLeaf: " << n.minmax[6]
+    //             << " isLeft: " << n.minmax[7] << " triStart: " <<
+    //             n.indices[0]
+    //             << " triEnd: " << n.indices[1] << " leftInd: " <<
+    //             n.indices[2]
+    //             << " rightInd: " << n.indices[3] << "\n";
+    // }
     // ssbo for bvh
     glGenBuffers(1, &bvhSSbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, bvhSSbo);
@@ -174,12 +195,13 @@ private:
   Shader displayShader = Shader("../shaders/rayTracerDisplay.vert",
                                 "../shaders/rayTracerDisplay.frag");
 
-  Model pawn = Model("../models/pawn/LOW_POLY_piece_Pawn.obj");
+  Model pawn = Model("../models/backpack/backpack.obj");
 
   RayTracingCamera cam = RayTracingCamera(
       raytracerShader, globalWindowState.width, globalWindowState.height);
-  int samplesPerPixel = 4;
+  int samplesPerPixel = 2;
 
   std::vector<Triangle> triangles;
   std::vector<arrayNode> nodes;
+  bool stopInput = false;
 };

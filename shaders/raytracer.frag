@@ -33,6 +33,7 @@ struct Material{
   float roughness;
   vec3 specularColor;
   float fuzz;
+  float ior; // index of refraction
 };
 
 
@@ -449,19 +450,24 @@ bool hit(Ray r, inout HitInfo ht,float closestHit){
 	 // }
 	 BvhNode bn = shaderNodeToBvhNode(bvh[bvhStack[pointer--]]);
 	 if(hitBoundingBox(bn.min,bn.max, r)){
+		if (bvhStack[pointer] == 1){
+		  // return vec3(0.0,0.0,0.0);
+		}
 		if (bn.isLeafNode){
-	 // return vec3(1.0,0.0,1.0);
+		  // return vec3(1.0,0.0,1.0);
 		  if (hitTriangles(bn.triStart,bn.triEnd,r,ht,closestHit)){
-// return vec3(1, 0.302, 0.965);
+			 // return vec3(0.0, 0.0, 1.0);
 			 closestHit = ht.t;
 			 hitAnything = true;
+		  }else{
+			 // return vec3(1, 0.302, 0.965);
 		  }
 		}
 		else{
-		  if (bn.leftInd !=-1){
-			 bvhStack[++pointer]=bn.leftInd;
-		  } if(bn.rightInd != -1){
-			 bvhStack[++pointer] = bn.rightInd;
+		  if (bn.rightInd !=-1){
+			 bvhStack[++pointer]=bn.rightInd;
+		  } if(bn.leftInd != -1){
+			 bvhStack[++pointer] = bn.leftInd;
 		  }
 		}
 	 }
@@ -598,6 +604,30 @@ bool scatter(in Ray r_in, HitInfo h, out vec3 albedo, out Ray scattered){
 		albedo = h.mat.albedo;
 		return true;
 	 };
+	 case (DIELECTRIC):{
+		scattered.origin = h.position;
+		float refractionRatio = isFrontFace(r_in.direction, h.normal)
+		  ? (1.0 / h.mat.ior)
+		  : h.mat.ior;
+
+		vec3 unitDir = normalize(r_in.direction);
+
+		float cosTheta = min(dot(-unitDir, h.normal), 1.0);
+		float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+		bool cannotRefract = refractionRatio * sinTheta > 1.0;
+
+		vec3 direction;
+
+		if (cannotRefract)
+		  direction = reflect(unitDir, h.normal);
+		else
+		  direction = refract(unitDir, h.normal, refractionRatio);
+
+		scattered.direction = direction;
+		albedo = vec3(1.0);
+		return true;
+	 };
 	 default:{
 		return false;
 	 }
@@ -626,9 +656,9 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 	 }
 	 bool hitAnything=false;
 	 HitInfo h;
-	 if (hitSpheres(world,r,h,1.0/0.0)){
-		hitAnything=true; 
-	 }
+	 // if (hitSpheres(world,r,h,1.0/0.0)){
+	 // hitAnything=true; 
+	 // }
 	 float closest = 1.0/0.0;
 	 if(hitAnything){
 		closest = h.t;
@@ -642,6 +672,17 @@ vec3 rayColor(Ray r, Sphere[3]world,Quad[7] quads, int maxDepth){
 	 // return hitTriangles(triangles,r,h,closest);
 	 // return hit(r,h,closest);
 	 if (hit(r,h,closest)){
+	 Material copper_metal;
+	 copper_metal.type = METAL;
+	 copper_metal.albedo = vec3(0.9, 0.5, 0.3);
+	 copper_metal.fuzz = 0.0f;
+
+	 Material glass;
+	 glass.type = DIELECTRIC;
+	 glass.albedo = vec3(1.0);
+	 glass.ior = 1.5f;
+	 glass.fuzz = 0.0f;
+	 h.mat = copper_metal;
 	 hitAnything =true;
 	 }
 	 // if (hitTriangles(0,triangleCount,r,h,closest)){
@@ -687,7 +728,7 @@ vec3 multiSampleLoop(Sphere[3] world,Quad[7] q,int samplesPerPixel,vec3 origin, 
 	 vec3 offset = randomSample.x*delta_u + randomSample.y*delta_v;
 	 vec3 rayDir = normalize(( fragCoord-origin )+offset);
 	 Ray r = createRay(origin,rayDir);
-	 color+= rayColor(r,world,q,4);
+	 color+= rayColor(r,world,q,6);
   }
   color= color/samplesPerPixel;
   return color;
@@ -782,11 +823,11 @@ void main() {
   s[0].origin = camera_position+100;
   s[0].radius = 40;
   s[0].mat = light;
-  s[1].origin = vec3(200.0, 120.0, 400.0);
-  s[1].radius = 100.0;
+  s[1].origin = vec3(0.0, 200.0, 30.0);
+  s[1].radius = 60.0;
   s[1].mat = blue_metal;
-  s[2].origin = vec3(400.0, 150.0, 300.0);
-  s[2].radius = 40.0;
+  s[2].origin = vec3(150.0, 180.0, 250.0);
+  s[2].radius = 35.0;
   s[2].mat = green;
 
   Triangle t[1];
@@ -803,67 +844,65 @@ void main() {
   Quad q[7];
 
 
-  // Left wall (green) — x = 555, normal = -X
+  // Half size of the room
+  float h = 277.5f;
+
+  // Left wall (x = +h)
   q[0] = CreateQuad(
-	 vec3(555, 0, 0),
+	 vec3(h, -h, -h),
 	 vec3(0, 0, 555),
 	 vec3(0, 555, 0)
   );
   q[0].mat = green;
   q[0].oneSided = true;
 
-
-  // Right wall (red) — x = 0, normal = +X
+  // Right wall (x = -h)
   q[1] = CreateQuad(
-	 vec3(0, 0, 0),
+	 vec3(-h, -h, -h),
 	 vec3(0, 555, 0),
 	 vec3(0, 0, 555)
   );
-  q[1].mat = green_diffuse;
+  q[1].mat = gold_metal;
   q[1].oneSided = true;
-  // Light (ceiling rectangle) — keep double-sided
+
+  // Ceiling light
   q[2] = CreateQuad(
-	 vec3(343, 554, 332),
+	 vec3(343 - h, 554 - h, 332 - h),
 	 vec3(-130, 0, 0),
 	 vec3(0, 0, -105)
   );
   q[2].mat = light;
-  // q[2].oneSided = false; // IMPORTANT: leave it off
 
-
-  // Floor — y = 0, normal = +Y
+  // Floor (y = -h)
   q[3] = CreateQuad(
-	 vec3(0, 0, 0),
+	 vec3(-h, -h, -h),
 	 vec3(0, 0, 555),
 	 vec3(555, 0, 0)
   );
   q[3].mat = blue_diffuse;
   q[3].oneSided = true;
 
-
-  // Ceiling — y = 555, normal = -Y
+  // Ceiling (y = +h)
   q[4] = CreateQuad(
-	 vec3(555, 555, 555),
+	 vec3(h, h, h),
 	 vec3(-555, 0, 0),
 	 vec3(0, 0, -555)
   );
   q[4].mat = blue_diffuse;
   q[4].oneSided = true;
 
-
-  // Back wall — z = 555, normal = -Z
+  // Back wall (z = +h)
   q[5] = CreateQuad(
-	 vec3(0, 0, 555),
+	 vec3(-h, -h, h),
 	 vec3(0, 555, 0),
 	 vec3(555, 0, 0)
   );
   q[5].mat = blue_diffuse;
   q[5].oneSided = true;
 
-
-  // Front wall — z = 0, normal = +Z
+  // Front wall (z = -h)
   q[6] = CreateQuad(
-	 vec3(0, 0, 0),
+	 vec3(-h, -h, -h),
 	 vec3(555, 0, 0),
 	 vec3(0, 555, 0)
   );
@@ -878,25 +917,4 @@ void main() {
   vec3 color = multiSampleLoop(s,q,uSamplesPerPixel,camera_position,viewPortPixelCoord);
   vec4 pervColor = texture(prevTexture,((FragPosition+1)*0.5 ).xy);
   FragColor =mix(pervColor, vec4(color, 1.0), 1.0 / float(frame));
-
-  // if (FragColor.x>=1.0/0.0||FragColor.y>=1.0/0.0||FragColor.z>=1.0/0.0){
-  // FragColor = vec4(0.0, 1, 0.0,1.0);
-  // }
-  // triangles.length();
-  // for (int i =0; i<7;i++){
-  // if (bvh[i].minmax[6]>0.5 && i == 1){
-  // FragColor = vec4(1.0,0.0,0.0,1.0);
-  // return;
-  // }
-  // else{
-  // FragColor = vec4(0.0,0.0,1.0, 1.0);
-  // }}
-  // if (bvh.length()==7){
-  // FragColor = vec4(1.0,0.0,0.0,1.0);
-  // }
-  // else{
-  // FragColor = vec4(0.0,0.0,1.0, 1.0);
-  // }
-  // FragColor = vec4(float( bvh.length() )/10,0.0,0.0,1.0);
-  
 }

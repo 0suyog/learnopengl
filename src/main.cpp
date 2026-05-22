@@ -158,18 +158,6 @@ int main() {
     rayTracedScene.update(deltaTime);
     rayTracedScene.draw();
 
-    // Scene::current = &randomBoxesScene;
-    // randomBoxesScene.update(deltaTime);
-    // randomBoxesScene.draw();
-
-    // Scene::current = &moveObject;
-    // moveObject.update(deltaTime);
-    // moveObject.draw();
-
-    // Scene::current = &screenToWorldSpace;
-    // screenToWorldSpace.update(deltaTime);
-    // screenToWorldSpace.draw();
-
     process_input(window);
     globalInputState.deltaX = 0;
     globalInputState.deltaY = 0;

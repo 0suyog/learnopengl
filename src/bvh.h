@@ -45,14 +45,21 @@ public:
 
   bvh(std::vector<Triangle> _triangles) {
     triangles = _triangles;
-    float minX, minY, minZ, maxX, maxY, maxZ;
+    float minX = infinity, minY = infinity, minZ = infinity;
+    float maxX = -infinity, maxY = -infinity, maxZ = -infinity;
     for (const auto &trig : triangles) {
-      minX = glm::min(trig.p1.x, glm::min(trig.p2.x, trig.p3.x));
-      minY = glm::min(trig.p1.y, glm::min(trig.p2.y, trig.p3.y));
-      minZ = glm::min(trig.p1.z, glm::min(trig.p2.z, trig.p3.z));
-      maxX = glm::max(trig.p1.x, glm::max(trig.p2.x, trig.p3.x));
-      maxY = glm::max(trig.p1.y, glm::max(trig.p2.y, trig.p3.y));
-      maxZ = glm::max(trig.p1.z, glm::max(trig.p2.z, trig.p3.z));
+      minX =
+          glm::min(minX, glm::min(trig.p1.x, glm::min(trig.p2.x, trig.p3.x)));
+      minY =
+          glm::min(minY, glm::min(trig.p1.y, glm::min(trig.p2.y, trig.p3.y)));
+      minZ =
+          glm::min(minZ, glm::min(trig.p1.z, glm::min(trig.p2.z, trig.p3.z)));
+      maxX =
+          glm::max(maxX, glm::max(trig.p1.x, glm::max(trig.p2.x, trig.p3.x)));
+      maxY =
+          glm::max(maxY, glm::max(trig.p1.y, glm::max(trig.p2.y, trig.p3.y)));
+      maxZ =
+          glm::max(maxZ, glm::max(trig.p1.z, glm::max(trig.p2.z, trig.p3.z)));
     }
     head = split(std::make_shared<node>(
         node{.isLeafNode = false,
@@ -73,21 +80,22 @@ private:
     parentNode->bbox.getAxisValue(axis, min, max, mid);
     bool partitioned = false;
     int partitionPoint = (parentNode->triStart + parentNode->triEnd) / 2;
-    int leftSide = parentNode->triStart;
-    int rightSide = parentNode->triEnd - 1;
-    while (leftSide <= rightSide) {
-      if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 1) {
-        leftSide++;
-      } else if (triangles[rightSide].leftOrRight(axis, min, mid, max) == 2) {
-        rightSide--;
-      } else {
-        std::swap(triangles[leftSide], triangles[rightSide]);
-        leftSide++;
-        rightSide--;
-      }
-    }
+    // int leftSide = parentNode->triStart;
+    // int rightSide = parentNode->triEnd - 1;
+    // while (leftSide <= rightSide) {
+    //   if (triangles[leftSide].leftOrRight(axis, min, mid, max) == 1) {
+    //     leftSide++;
+    //   } else if (triangles[rightSide].leftOrRight(axis, min, mid, max) == 2)
+    //   {
+    //     rightSide--;
+    //   } else {
+    //     std::swap(triangles[leftSide], triangles[rightSide]);
+    //     leftSide++;
+    //     rightSide--;
+    //   }
+    // }
 
-    partitionPoint = leftSide;
+    // partitionPoint = leftSide;
 
     if (partitionPoint == parentNode->triStart ||
         partitionPoint == parentNode->triEnd) {
@@ -162,7 +170,7 @@ inline int toArray(const std::shared_ptr<node> n,
   sn.indices = {n->triStart, n->triEnd, -1, -1};
   shaderNodes.push_back(sn);
   int ind = shaderNodes.size() - 1;
-  std::cerr << ind << " " << n->isLeafNode << "\n";
+  // std::cerr << ind << " " << n->isLeafNode << "\n";
   if (n->isLeafNode)
     return ind;
 
